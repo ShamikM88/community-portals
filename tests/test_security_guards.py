@@ -94,10 +94,15 @@ class SecurityGuardsTest(unittest.TestCase):
             "list item continuation": f"allowed-tools:\n  - {CLI}\n    Bash",
             "list item star": f"allowed-tools:\n  - {CLI}\n    *",
             "folded then list": f"allowed-tools: >\n  Bash\n  - {CLI}",
+            "line separator comment": f"allowed-tools: {CLI}\u2028# Bash",
+            "next-line char": f"allowed-tools: {CLI}\x85x:,Bash",
+            "paragraph separator star": f"allowed-tools: {CLI}\u2029# *",
+            "lone carriage return": "name: x\rallowed-tools: Bash",
+            "separator before delimiter": "name: x\u2028---\nallowed-tools: Bash",
         }
         for label, frontmatter in shapes.items():
             with self.subTest(label):
-                (self.portal / "SKILL.md").write_text(f"---\n{frontmatter}\n---\n")
+                (self.portal / "SKILL.md").write_text(f"---\n{frontmatter}\n---\n", encoding="utf-8")
                 self.assertEqual(self.run_guard().returncode, 1)
 
     def test_dynamic_context_variants_fail(self):

@@ -45,6 +45,9 @@ INSTALL_CONFIG_FILES = ("bunfig.toml", ".npmrc")
 # loads and splice their output into the prompt, with no permission check.
 DYNAMIC_CONTEXT = re.compile(r"```!|!`[^`]+`")
 PORTAL_SEGMENT = re.compile(r"[a-z0-9-]+")
+# Characters str.splitlines() breaks on but YAML 1.2 keeps inside a line; a
+# line this guard splits and YAML does not is a grant this guard never sees.
+FOREIGN_LINE_BREAK = re.compile("[\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")
 
 
 def _key(name: str) -> str:
@@ -66,6 +69,9 @@ def _frontmatter(text: str):
     problem, not a skip: a real YAML parser may read it as a grant.
     """
     text = text.lstrip("\ufeff")  # a BOM from a Windows editor is not content
+    foreign = FOREIGN_LINE_BREAK.search(text)
+    if foreign:
+        return {}, [f"character {foreign.group()!r} that YAML and this guard split into lines differently"]
     lines = text.splitlines()
     if not lines or lines[0].rstrip() != "---":
         return None, []
