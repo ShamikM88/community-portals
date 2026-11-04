@@ -1,0 +1,66 @@
+# Adapted from the discover-clis and cli-checks jobs in ai-job-search-dev/ai-job-search .github/workflows/ci.yml.
+
+name: CLI checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover-clis:
+    # The matrix is discovered, not hardcoded, so a contributed portal CLI
+    # gets typechecked and tested without anyone editing this workflow.
+    name: Discover portal CLIs
+    runs-on: ubuntu-latest
+    outputs:
+      tools: ${{ steps.list.outputs.tools }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - id: list
+        run: |
+          if [ -d portals ]; then
+            tools=$(find portals -mindepth 4 -maxdepth 4 -path '*/cli/package.json' \
+              | cut -d/ -f2,3 | sort | jq -R . | jq -cs .)
+          else
+            tools='[]'
+          fi
+          echo "Discovered portal CLIs: $tools"
+          echo "tools=$tools" >> "$GITHUB_OUTPUT"
+
+  cli-checks:
+    name: CLI checks ${{ matrix.tool }}
+    needs: discover-clis
+    if: needs.discover-clis.outputs.tools != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: ${{ fromJSON(needs.discover-clis.outputs.tools) }}
+    defaults:
+      run:
+        working-directory: portals/${{ matrix.tool }}/cli
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+      - run: bun install
+      - run: bun run typecheck
+      - name: Run fixture/mock tests when present
+        # The tool name is a directory name a pull request controls, so it
+        # reaches the shell as data through env, never as expanded script text.
+        env:
+          TOOL: ${{ matrix.tool }}
+        run: |
+          if find tests -type f -name '*.test.ts' | grep -q .; then
+            bun test
+          else
+            echo "No Bun tests found for $TOOL; skipping"
+          fi
