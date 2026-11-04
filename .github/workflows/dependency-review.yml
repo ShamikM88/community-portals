@@ -1,0 +1,42 @@
+# Adapted from the dependency-review job in ai-job-search-dev/ai-job-search's ci.yml.
+
+name: Dependency review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency review
+    # Requires the repo's Dependency graph, so the graph is probed first and the
+    # job warns and passes instead of hard-failing if it's unavailable. Enabling
+    # Dependency graph under Settings -> Advanced Security activates the check.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Probe Dependency graph availability
+        id: graph
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$REPO/dependency-graph/sbom")
+          if [ "$code" = "200" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Dependency graph is not enabled on this repository (HTTP $code). Dependency review was skipped - enable Dependency graph under Settings -> Advanced Security to activate this check."
+          fi
+      - name: Dependency review
+        if: steps.graph.outputs.enabled == 'true'
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
