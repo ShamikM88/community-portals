@@ -69,7 +69,9 @@ def _frontmatter(text: str):
     problem, not a skip: a real YAML parser may read it as a grant.
     """
     text = text.lstrip("\ufeff")  # a BOM from a Windows editor is not content
-    foreign = FOREIGN_LINE_BREAK.search(text)
+    nl_lines = text.split("\n")
+    close = next((i for i in range(1, len(nl_lines)) if nl_lines[i].rstrip() == "---"), len(nl_lines))
+    foreign = FOREIGN_LINE_BREAK.search("\n".join(nl_lines[: close + 1]))
     if foreign:
         return {}, [f"character {foreign.group()!r} that YAML and this guard split into lines differently"]
     lines = text.splitlines()
@@ -184,8 +186,10 @@ def check_skill_tool_grants() -> None:
 
 
 def _reject_duplicate_keys(pairs):
-    keys = [key for key, _ in pairs]
-    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    seen, duplicates = set(), set()
+    for key, _ in pairs:
+        (duplicates if key in seen else seen).add(key)
+    duplicates = sorted(duplicates)
     if duplicates:
         raise ValueError(f"duplicate key(s) {duplicates}; bun and this guard disagree on which wins")
     return dict(pairs)

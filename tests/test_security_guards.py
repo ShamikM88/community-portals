@@ -76,6 +76,11 @@ class SecurityGuardsTest(unittest.TestCase):
         result = self.run_guard()
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_line_separator_in_body_passes(self):
+        self.write_skill(f"allowed-tools: {CLI}", "First paragraph.\u2028Second line.")
+        result = self.run_guard()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_frontmatter_hooks_fails(self):
         self.write_frontmatter("hooks:\n  PreToolUse: []")
         self.assert_fails("frontmatter `hooks`")
