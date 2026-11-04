@@ -59,7 +59,7 @@ jobs:
         env:
           TOOL: ${{ matrix.tool }}
         run: |
-          if find tests -type f -name '*.test.ts' | grep -q .; then
+          if find tests -type f -name '*.test.ts' -print -quit | grep -q .; then
             bun test
           else
             echo "No Bun tests found for $TOOL; skipping"
