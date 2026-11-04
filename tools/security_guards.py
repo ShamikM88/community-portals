@@ -14,8 +14,8 @@ Checks:
 1. portals/**/package.json — no npm/bun lifecycle scripts (preinstall,
    install, postinstall, preprepare, prepare, postprepare, prepack), no
    trustedDependencies, no workspaces, and no bunfig.toml or .npmrc beside
-   the manifest. Catches
-   code execution smuggled into `bun install`, and a registry swap.
+   the manifest. Catches code execution smuggled into `bun install`, and a
+   registry swap.
 2. Skill frontmatter — a portals/<country>/<portal>/SKILL.md may grant in
    `allowed-tools` exactly its own CLI, as installed into a fork at
    .agents/skills/<portal>/, and nothing else. Claude Code pre-approves these
