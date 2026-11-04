@@ -35,23 +35,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 errors: list[str] = []
 
-FORBIDDEN_SCRIPTS = {"preinstall", "install", "postinstall", "prepare", "prepack"}
-# Manifest keys that pull code into `bun install` by another door: `workspaces`
-# installs sub-packages with their own lifecycle scripts, and
-# `trustedDependencies` re-enables dependency scripts. A bunfig.toml or .npmrc
-# beside the manifest reconfigures the install itself (registry, scopes,
-# cache), so every dependency can come from a server the portal's author
-# picked; both are refused for the same reason.
-FORBIDDEN_MANIFEST_KEYS = {"trustedDependencies", "workspaces"}
+FORBIDDEN_SCRIPTS = {
+    "preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare", "prepack",
+}
 INSTALL_CONFIG_FILES = ("bunfig.toml", ".npmrc")
 
-# A skill line of the form !`command` runs the command when the skill loads
-# and splices its output into the prompt, with no permission check.
-DYNAMIC_CONTEXT = re.compile(r"!`[^`\n]+`")
+# !`command` (which may span lines) and ```! fenced blocks run when the skill
+# loads and splice their output into the prompt, with no permission check.
+DYNAMIC_CONTEXT = re.compile(r"```!|!`[^`]+`")
+PORTAL_SEGMENT = re.compile(r"[a-z0-9-]+")
 
 
 def _key(name: str) -> str:
-    """Frontmatter key spelling-insensitive: permissionMode, permission-mode, ..."""
+    """Frontmatter key spelling-insensitive: hooks, Hooks, ..."""
     return name.lower().replace("-", "").replace("_", "")
 
 _FRONTMATTER_KEY = re.compile(r"^([A-Za-z0-9_-]+):\s*(.*)$")
@@ -60,25 +56,29 @@ _FRONTMATTER_KEY = re.compile(r"^([A-Za-z0-9_-]+):\s*(.*)$")
 def _frontmatter(text: str):
     """Parse the YAML-ish frontmatter the repo's skills use, stdlib only.
 
-    Returns a dict, or None when the file has no frontmatter. Handles
-    `key: value`, folded/literal scalars (`key: >` / `key: |` followed by
-    indented lines), and `key:` followed by `- item` lines. Indented lines
-    never start a key, so a folded description mentioning "Bash" cannot be
-    mistaken for a grant. Anything fancier than that is not used here, and
-    an unrecognised shape surfaces as a missing key rather than a crash.
+    Returns (dict, problems), or (None, []) when the file has no frontmatter.
+    Handles `key: value`, folded/literal scalars (`key: >` / `key: |` followed
+    by indented lines), and `key:` followed by indented `- item` lines.
+    Indented lines never start a key, so a folded description mentioning
+    "Bash" cannot be mistaken for a grant. Any other shape is a problem, not
+    a skip: a real YAML parser may read it as a grant this one never saw.
     """
-    text = text.lstrip("﻿")  # a BOM from a Windows editor is not content
-    if not text.startswith("---"):
-        return None
+    text = text.lstrip("\ufeff")  # a BOM from a Windows editor is not content
     lines = text.splitlines()
-    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if not lines or lines[0].rstrip() != "---":
+        return None, []
+    end = next((i for i in range(1, len(lines)) if lines[i].rstrip() == "---"), None)
     if end is None:
-        return None
+        return None, []
     data: dict = {}
+    problems: list[str] = []
     key = None
-    for raw in lines[1:end]:
+    for number, raw in enumerate(lines[1:end], start=2):
+        if not raw.strip() or raw.startswith("#"):
+            continue
         if raw[:1] in (" ", "\t"):
             if key is None:
+                problems.append(f"line {number}: indented line outside any key: {raw!r}")
                 continue
             stripped = raw.strip()
             if stripped.startswith("- "):
@@ -90,11 +90,14 @@ def _frontmatter(text: str):
             continue
         match = _FRONTMATTER_KEY.match(raw)
         if not match:
+            problems.append(f"line {number}: unsupported frontmatter syntax: {raw!r}")
             key = None
             continue
         key, value = match.group(1), match.group(2).strip()
+        if key in data:
+            problems.append(f"line {number}: duplicate key {key!r}")
         data[key] = "" if value in (">", "|", ">-", "|-") else value
-    return data
+    return data, problems
 
 
 def _tool_entries(value) -> list:
@@ -121,14 +124,15 @@ def _tool_entries(value) -> list:
     return [entry for entry in entries if entry]
 
 
-def _own_cli_grant(path: Path) -> set:
+def _own_cli_grant(rel: str) -> set:
     """The two spellings of 'this portal skill may run its own CLI'."""
-    try:
-        rel = path.relative_to(ROOT).as_posix()
-    except ValueError:
-        return set()
     parts = rel.split("/")
-    if len(parts) == 4 and parts[0] == "portals" and parts[3] == "SKILL.md":
+    if (
+        len(parts) == 4
+        and parts[0] == "portals"
+        and parts[3] == "SKILL.md"
+        and all(PORTAL_SEGMENT.fullmatch(part) for part in parts[1:3])
+    ):
         cli = f"bun run .agents/skills/{parts[2]}/cli/src/cli.ts"
         return {f"Bash({cli} *)", f"Bash({cli}:*)"}
     return set()
@@ -150,27 +154,23 @@ def check_skill_tool_grants() -> None:
                 "permission check, so this is a pre-approved shell command. Move it into a step "
                 "the model runs, where the user's settings decide."
             )
-        data = _frontmatter(text)
-        if data is not None and "hooks" in {_key(k) for k in data}:
+        data, problems = _frontmatter(text)
+        if data is None:
+            errors.append(f"{rel}: missing or unterminated frontmatter (expected --- ... ---)")
+            continue
+        for problem in problems:
+            errors.append(
+                f"{rel}: frontmatter {problem}. This guard reads only plain `key: value` lines "
+                "and fails closed on anything else, which Claude Code might read as a grant."
+            )
+        if "hooks" in {_key(k) for k in data}:
             errors.append(
                 f"{rel}: frontmatter `hooks`. A skill hook runs its command with no prompt "
                 "whenever its event fires while the skill is active; portals ship no hooks."
             )
-        if data is None:
-            errors.append(f"{rel}: missing or unterminated frontmatter (expected --- ... ---)")
-            continue
-        permitted = _own_cli_grant(path)
+        permitted = _own_cli_grant(rel)
         for entry in _tool_entries(data.get("allowed-tools", "")):
             if entry in permitted:
-                continue
-            if "*" in entry and not (
-                entry.endswith((" *)", ":*)")) and "*" not in entry[:-2]
-            ):
-                errors.append(
-                    f"{rel}: allowed-tools entry uses a wildcard inside the pattern: "
-                    f"{entry!r}. A glob here pre-approves whatever lands at that path, "
-                    "including code added later; name the exact command instead."
-                )
                 continue
             errors.append(
                 f"{rel}: allowed-tools entry not in the reviewed allowlist: {entry!r}. "
@@ -182,6 +182,14 @@ def check_skill_tool_grants() -> None:
             )
 
 
+def _reject_duplicate_keys(pairs):
+    keys = [key for key, _ in pairs]
+    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicates:
+        raise ValueError(f"duplicate key(s) {duplicates}; bun and this guard disagree on which wins")
+    return dict(pairs)
+
+
 def check_package_manifests() -> None:
     manifests = [
         p for p in ROOT.glob("portals/**/package.json") if "node_modules" not in p.parts
@@ -189,8 +197,10 @@ def check_package_manifests() -> None:
     for manifest in sorted(manifests):
         relpath = manifest.relative_to(ROOT)
         try:
-            data = json.loads(manifest.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            data = json.loads(
+                manifest.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys
+            )
+        except (OSError, ValueError) as exc:
             errors.append(f"{relpath}: unreadable or invalid JSON: {exc}")
             continue
         if not isinstance(data, dict):

@@ -1,11 +1,10 @@
+# Adapted from the security-guards job in ai-job-search-dev/ai-job-search's ci.yml.
 # Portals ship CLI code and skill frontmatter that every fork user executes,
 # so this job fails PRs that add package lifecycle scripts or install config,
 # or widen a skill's allowed-tools beyond its own CLI. Honest limit: a PR can
 # edit this workflow itself, so these guards catch accidents and casual
 # attempts, not a determined author - branch protection with required checks
 # and human review remain the real backstop.
-# Actions are pinned to commit SHAs; the token is read-only, and no checkout
-# leaves it in .git/config (persist-credentials: false) for later steps to read.
 
 name: Security guards
 
