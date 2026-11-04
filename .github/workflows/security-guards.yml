@@ -1,0 +1,33 @@
+# Portals ship CLI code and skill frontmatter that every fork user executes,
+# so this job fails PRs that add package lifecycle scripts or install config,
+# or widen a skill's allowed-tools beyond its own CLI. Honest limit: a PR can
+# edit this workflow itself, so these guards catch accidents and casual
+# attempts, not a determined author - branch protection with required checks
+# and human review remain the real backstop.
+# Actions are pinned to commit SHAs; the token is read-only, and no checkout
+# leaves it in .git/config (persist-credentials: false) for later steps to read.
+
+name: Security guards
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-guards:
+    name: Security guards (manifests, skill frontmatter)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: python tools/security_guards.py
+      - run: python -m unittest discover -s tests -v
