@@ -71,6 +71,11 @@ class SecurityGuardsTest(unittest.TestCase):
         result = self.run_guard()
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_own_cli_list_form_passes(self):
+        self.write_skill(f"allowed-tools:\n  - {CLI}", "Run the CLI.")
+        result = self.run_guard()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_frontmatter_hooks_fails(self):
         self.write_frontmatter("hooks:\n  PreToolUse: []")
         self.assert_fails("frontmatter `hooks`")
@@ -85,6 +90,10 @@ class SecurityGuardsTest(unittest.TestCase):
             "explicit key": "? allowed-tools\n: Bash",
             "indented mapping": " name: x\n allowed-tools: Bash",
             "indented delimiter": "description: >\n  x\n  ---\nallowed-tools: Bash",
+            "scalar then list": f"allowed-tools: Bash\n  - {CLI}",
+            "list item continuation": f"allowed-tools:\n  - {CLI}\n    Bash",
+            "list item star": f"allowed-tools:\n  - {CLI}\n    *",
+            "folded then list": f"allowed-tools: >\n  Bash\n  - {CLI}",
         }
         for label, frontmatter in shapes.items():
             with self.subTest(label):

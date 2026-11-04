@@ -12,8 +12,9 @@ the change is explicit and reviewable rather than buried.
 
 Checks:
 1. portals/**/package.json — no npm/bun lifecycle scripts (preinstall,
-   install, postinstall, prepare, prepack), no trustedDependencies, no
-   workspaces, and no bunfig.toml or .npmrc beside the manifest. Catches
+   install, postinstall, preprepare, prepare, postprepare, prepack), no
+   trustedDependencies, no workspaces, and no bunfig.toml or .npmrc beside
+   the manifest. Catches
    code execution smuggled into `bun install`, and a registry swap.
 2. Skill frontmatter — a portals/<country>/<portal>/SKILL.md may grant in
    `allowed-tools` exactly its own CLI, as installed into a fork at
@@ -57,11 +58,12 @@ def _frontmatter(text: str):
     """Parse the YAML-ish frontmatter the repo's skills use, stdlib only.
 
     Returns (dict, problems), or (None, []) when the file has no frontmatter.
-    Handles `key: value`, folded/literal scalars (`key: >` / `key: |` followed
-    by indented lines), and `key:` followed by indented `- item` lines.
+    Each value is the raw text of its `key:` line plus every indented line
+    under it (a leading `- ` dropped), so whatever scalar or list YAML builds
+    from those lines, its tokens are all in the value this guard checks.
     Indented lines never start a key, so a folded description mentioning
-    "Bash" cannot be mistaken for a grant. Any other shape is a problem, not
-    a skip: a real YAML parser may read it as a grant this one never saw.
+    "Bash" cannot be mistaken for a grant. A line outside that shape is a
+    problem, not a skip: a real YAML parser may read it as a grant.
     """
     text = text.lstrip("\ufeff")  # a BOM from a Windows editor is not content
     lines = text.splitlines()
@@ -82,11 +84,8 @@ def _frontmatter(text: str):
                 continue
             stripped = raw.strip()
             if stripped.startswith("- "):
-                if not isinstance(data[key], list):
-                    data[key] = []
-                data[key].append(stripped[2:].strip())
-            elif isinstance(data[key], str):
-                data[key] = (data[key] + " " + stripped).strip()
+                stripped = stripped[2:]
+            data[key] = (data[key] + ", " + stripped) if data[key] else stripped
             continue
         match = _FRONTMATTER_KEY.match(raw)
         if not match:
@@ -100,12 +99,8 @@ def _frontmatter(text: str):
     return data, problems
 
 
-def _tool_entries(value) -> list:
-    """Split an `allowed-tools` value into entries (string or list form)."""
-    if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    if not isinstance(value, str):
-        return []
+def _tool_entries(value: str) -> list:
+    """Split an `allowed-tools` value as Claude Code does: on commas and whitespace outside parens."""
     value = value.strip()
     if value.startswith("[") and value.endswith("]"):  # YAML flow list
         value = value[1:-1]
@@ -115,7 +110,7 @@ def _tool_entries(value) -> list:
             depth += 1
         elif char == ")":
             depth = max(depth - 1, 0)
-        if char == "," and depth == 0:
+        if (char == "," or char.isspace()) and depth == 0:
             entries.append("".join(current).strip())
             current = []
         else:
