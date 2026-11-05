@@ -25,11 +25,13 @@ Checks:
    and no !`command` dynamic-context line: both run a command when the skill
    loads, before any prompt.
 3. .github/CODEOWNERS — every portals/<country>/<board>-search/ folder has
-   exactly one line naming at least one owner, every line mentioning portals
-   names one existing portal folder (no globs, no country-level lines), and
-   each <board>-search name is unique across countries. Catches a portal
-   nobody owns, a line that silently stops matching, and two boards that
-   collide when installed flat into .agents/skills/.
+   exactly one line naming at least one valid owner (@user, @org/team or an
+   email), every line mentioning portals names one existing portal folder (no
+   globs, no country-level lines), no other line follows the first portal
+   line, and each <board>-search name is unique across countries. Catches a
+   portal nobody owns, a later line that overrides a portal's owners, a line
+   that silently stops matching, and two boards that collide when installed
+   flat into .agents/skills/.
 
 Stdlib only. Exit 0 on success, 1 with a failure list otherwise.
 """
