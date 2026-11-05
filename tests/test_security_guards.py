@@ -188,6 +188,12 @@ class SecurityGuardsTest(unittest.TestCase):
         result = self.run_guard()
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_codeowners_non_portal_line_after_portal_line_fails(self):
+        for pattern in ("*", "*.ts", "/tools/"):
+            with self.subTest(pattern):
+                self.write_codeowners("/portals/dk/jobindex-search/ @alice", f"{pattern} @bob")
+                self.assert_fails("portal lines must come last")
+
     def test_same_board_in_two_countries_fails(self):
         self.add_portal("se", "jobindex-search")
         self.write_codeowners("/portals/dk/jobindex-search/ @alice", "/portals/se/jobindex-search/ @bob")

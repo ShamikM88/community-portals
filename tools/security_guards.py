@@ -277,10 +277,17 @@ def check_codeowners() -> None:
     lines: dict = {}
     for number, raw in enumerate(text.splitlines(), start=1):
         fields = raw.split("#", 1)[0].split()
-        if not fields or "portals" not in fields[0].lower():
+        if not fields:
             continue
         pattern, owners = fields[0], fields[1:]
         where = f".github/CODEOWNERS line {number}: {pattern!r}"
+        if "portals" not in pattern.lower():
+            if lines:
+                errors.append(
+                    f"{where} comes after a portal line. The last matching line wins, so it "
+                    "overrides the portal lines above it; portal lines must come last."
+                )
+            continue
         match = PORTAL_LINE.fullmatch(pattern)
         if not match:
             errors.append(
