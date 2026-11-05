@@ -56,6 +56,7 @@ PORTAL_SEGMENT = re.compile(r"[a-z0-9-]+")
 FOREIGN_LINE_BREAK = re.compile("[\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")
 # Leading and trailing slash are optional: gitignore semantics anchor and match the same folder.
 PORTAL_LINE = re.compile(rf"/?portals/({PORTAL_SEGMENT.pattern})/({PORTAL_SEGMENT.pattern}-search)/?")
+CODEOWNER = re.compile(r"@[A-Za-z0-9-]+(/[A-Za-z0-9._-]+)?|[^@\s]+@[^@\s]+\.[^@\s]+")
 
 
 def _key(name: str) -> str:
@@ -296,6 +297,12 @@ def check_codeowners() -> None:
                 f"{where} names no owner, which strips ownership from the portal. An unmaintained "
                 "portal keeps the maintainers on its line before the comment."
             )
+        for owner in owners:
+            if not CODEOWNER.fullmatch(owner):
+                errors.append(
+                    f"{where} invalid owner {owner!r}; GitHub ignores it. An owner is @user, "
+                    "@org/team, or an email address."
+                )
     for portal in portals:
         count = len(lines.get(portal, []))
         if count == 0:

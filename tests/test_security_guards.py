@@ -179,6 +179,15 @@ class SecurityGuardsTest(unittest.TestCase):
         self.write_codeowners("/portals/dk/jobindex-search/ # unmaintained since 2026-11")
         self.assert_fails("'/portals/dk/jobindex-search/' names no owner")
 
+    def test_codeowners_invalid_owner_fails(self):
+        self.write_codeowners("/portals/dk/jobindex-search/ alice")
+        self.assert_fails("invalid owner 'alice'")
+
+    def test_codeowners_team_and_email_owners_pass(self):
+        self.write_codeowners("/portals/dk/jobindex-search/ @ai-job-search-dev/maintainers alice@example.com")
+        result = self.run_guard()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_same_board_in_two_countries_fails(self):
         self.add_portal("se", "jobindex-search")
         self.write_codeowners("/portals/dk/jobindex-search/ @alice", "/portals/se/jobindex-search/ @bob")
