@@ -24,6 +24,12 @@ Checks:
    bare Bash and glob grants. The same files may carry no frontmatter `hooks`
    and no !`command` dynamic-context line: both run a command when the skill
    loads, before any prompt.
+3. .github/CODEOWNERS — every portals/<country>/<board>-search/ folder has
+   exactly one line naming at least one owner, every line mentioning portals
+   names one existing portal folder (no globs, no country-level lines), and
+   each <board>-search name is unique across countries. Catches a portal
+   nobody owns, a line that silently stops matching, and two boards that
+   collide when installed flat into .agents/skills/.
 
 Stdlib only. Exit 0 on success, 1 with a failure list otherwise.
 """
@@ -48,6 +54,8 @@ PORTAL_SEGMENT = re.compile(r"[a-z0-9-]+")
 # Characters str.splitlines() breaks on but YAML 1.2 keeps inside a line; a
 # line this guard splits and YAML does not is a grant this guard never sees.
 FOREIGN_LINE_BREAK = re.compile("[\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")
+# Leading and trailing slash are optional: gitignore semantics anchor and match the same folder.
+PORTAL_LINE = re.compile(rf"/?portals/({PORTAL_SEGMENT.pattern})/({PORTAL_SEGMENT.pattern}-search)/?")
 
 
 def _key(name: str) -> str:
@@ -241,18 +249,80 @@ def check_package_manifests() -> None:
                 )
 
 
+def check_codeowners() -> None:
+    portals = sorted(
+        p.relative_to(ROOT).as_posix() + "/" for p in ROOT.glob("portals/*/*-search") if p.is_dir()
+    )
+    boards: dict = {}
+    for portal in portals:
+        boards.setdefault(portal.split("/")[2], []).append(portal)
+    for board, paths in sorted(boards.items()):
+        if len(paths) > 1:
+            errors.append(
+                f"{board}: board folder name used in several countries ({', '.join(paths)}). "
+                "Installing copies <board>-search flat into .agents/skills/, so the names must be "
+                "unique across the whole repo."
+            )
+    codeowners = ROOT / ".github" / "CODEOWNERS"
+    if not codeowners.exists():
+        if portals:
+            errors.append(".github/CODEOWNERS: missing, so no portal folder has an owner")
+        return
+    try:
+        text = codeowners.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        errors.append(f".github/CODEOWNERS: unreadable (must be UTF-8): {exc}")
+        return
+    lines: dict = {}
+    for number, raw in enumerate(text.splitlines(), start=1):
+        fields = raw.split("#", 1)[0].split()
+        if not fields or "portals" not in fields[0].lower():
+            continue
+        pattern, owners = fields[0], fields[1:]
+        where = f".github/CODEOWNERS line {number}: {pattern!r}"
+        match = PORTAL_LINE.fullmatch(pattern)
+        if not match:
+            errors.append(
+                f"{where} is not a portal folder. A line mentioning portals must be exactly "
+                "/portals/<country>/<board>-search/ in lowercase, with no globs and no country-level lines."
+            )
+            continue
+        portal = f"portals/{match.group(1)}/{match.group(2)}/"
+        lines.setdefault(portal, []).append(number)
+        if not (ROOT / portal).is_dir():
+            errors.append(f"{where} points at a missing folder; remove the line or fix the path.")
+        if not owners:
+            errors.append(
+                f"{where} names no owner, which strips ownership from the portal. An unmaintained "
+                "portal keeps the maintainers on its line before the comment."
+            )
+    for portal in portals:
+        count = len(lines.get(portal, []))
+        if count == 0:
+            errors.append(f"{portal}: no CODEOWNERS line; add `/{portal} @<you>` to .github/CODEOWNERS.")
+        elif count > 1:
+            errors.append(
+                f"{portal}: {count} CODEOWNERS lines (lines {lines[portal]}); the last one silently "
+                "wins, so keep exactly one."
+            )
+
+
 def main() -> int:
     global ROOT
     if len(sys.argv) > 1:
         ROOT = Path(sys.argv[1]).resolve()
     check_package_manifests()
     check_skill_tool_grants()
+    check_codeowners()
     if errors:
         print(f"security_guards: {len(errors)} failure(s)")
         for err in errors:
             print(f"  - {err}")
         return 1
-    print("security_guards: OK (package manifests, skill allowed-tools, load-time commands)")
+    print(
+        "security_guards: OK (package manifests, skill allowed-tools, load-time commands, "
+        "CODEOWNERS coverage)"
+    )
     return 0
 
 

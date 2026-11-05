@@ -18,6 +18,16 @@ class SecurityGuardsTest(unittest.TestCase):
         (self.portal / "cli").mkdir(parents=True)
         self.write_manifest({"name": "jobindex-search", "scripts": {"test": "bun test"}})
         self.write_skill(f"allowed-tools: {CLI}", "Run the CLI.")
+        self.write_codeowners("/portals/dk/jobindex-search/ @alice")
+
+    def write_codeowners(self, *lines):
+        (self.root / ".github").mkdir(exist_ok=True)
+        (self.root / ".github" / "CODEOWNERS").write_text(
+            "\n".join(["* @jakob1379 @MadsLorentzen", *lines]) + "\n"
+        )
+
+    def add_portal(self, country, board):
+        (self.root / "portals" / country / board).mkdir(parents=True)
 
     def write_manifest(self, data):
         (self.portal / "cli" / "package.json").write_text(json.dumps(data))
@@ -145,6 +155,44 @@ class SecurityGuardsTest(unittest.TestCase):
     def test_bunfig_fails(self):
         (self.portal / "cli" / "bunfig.toml").write_text("[install]\n")
         self.assert_fails("bunfig.toml beside a portal manifest is forbidden")
+
+    def test_portal_without_codeowners_line_fails(self):
+        self.add_portal("se", "platsbanken-search")
+        self.assert_fails("portals/se/platsbanken-search/: no CODEOWNERS line")
+
+    def test_two_codeowners_lines_for_one_portal_fail(self):
+        self.write_codeowners("/portals/dk/jobindex-search/ @alice", "portals/dk/jobindex-search @bob")
+        self.assert_fails("portals/dk/jobindex-search/: 2 CODEOWNERS lines")
+
+    def test_codeowners_line_for_missing_folder_fails(self):
+        self.write_codeowners("/portals/dk/jobindex-search/ @alice", "/portals/se/platsbanken-search/ @bob")
+        self.assert_fails("'/portals/se/platsbanken-search/' points at a missing folder")
+
+    def test_codeowners_non_portal_pattern_fails(self):
+        patterns = ("/portals/dk/", "/portals/*/jobindex-search/", "/portals/**", "/portals/DK/jobindex-search/")
+        for pattern in patterns:
+            with self.subTest(pattern):
+                self.write_codeowners("/portals/dk/jobindex-search/ @alice", f"{pattern} @bob")
+                self.assert_fails(f"{pattern!r} is not a portal folder")
+
+    def test_codeowners_portal_line_without_owner_fails(self):
+        self.write_codeowners("/portals/dk/jobindex-search/ # unmaintained since 2026-11")
+        self.assert_fails("'/portals/dk/jobindex-search/' names no owner")
+
+    def test_same_board_in_two_countries_fails(self):
+        self.add_portal("se", "jobindex-search")
+        self.write_codeowners("/portals/dk/jobindex-search/ @alice", "/portals/se/jobindex-search/ @bob")
+        self.assert_fails("portals/dk/jobindex-search/, portals/se/jobindex-search/")
+
+    def test_missing_codeowners_with_portals_fails(self):
+        (self.root / ".github" / "CODEOWNERS").unlink()
+        self.assert_fails(".github/CODEOWNERS: missing")
+
+    def test_unmaintained_comment_after_owners_passes(self):
+        line = "/portals/dk/jobindex-search/ @jakob1379 @MadsLorentzen # unmaintained since 2026-11"
+        self.write_codeowners(line)
+        result = self.run_guard()
+        self.assertEqual(result.returncode, 0, result.stdout)
 
 
 if __name__ == "__main__":
