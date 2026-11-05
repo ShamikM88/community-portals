@@ -28,10 +28,11 @@ Checks:
    exactly one line naming at least one valid owner (@user, @org/team or an
    email), every line mentioning portals names one existing portal folder (no
    globs, no country-level lines), no other line follows the first portal
-   line, and each <board>-search name is unique across countries. Catches a
-   portal nobody owns, a later line that overrides a portal's owners, a line
-   that silently stops matching, and two boards that collide when installed
-   flat into .agents/skills/.
+   line, each <board>-search name is unique across countries, and the file has
+   no whitespace but space, tab, LF and CRLF. Catches a portal nobody owns, a
+   later line that overrides a portal's owners, a line that silently stops
+   matching, a line this guard splits and GitHub does not, and two boards that
+   collide when installed flat into .agents/skills/.
 
 Stdlib only. Exit 0 on success, 1 with a failure list otherwise.
 """
@@ -272,9 +273,16 @@ def check_codeowners() -> None:
             errors.append(".github/CODEOWNERS: missing, so no portal folder has an owner")
         return
     try:
-        text = codeowners.read_text(encoding="utf-8")
+        text = codeowners.read_bytes().decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         errors.append(f".github/CODEOWNERS: unreadable (must be UTF-8): {exc}")
+        return
+    foreign = re.search(r"[^\S \t\r\n]|\r(?!\n)", text)
+    if foreign:
+        errors.append(
+            f".github/CODEOWNERS line {text.count(chr(10), 0, foreign.start()) + 1}: {foreign.group()!r} is "
+            "whitespace other than space, tab or newline, which this guard and GitHub would split differently."
+        )
         return
     lines: dict = {}
     for number, raw in enumerate(text.splitlines(), start=1):

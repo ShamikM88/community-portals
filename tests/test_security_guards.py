@@ -194,6 +194,23 @@ class SecurityGuardsTest(unittest.TestCase):
                 self.write_codeowners("/portals/dk/jobindex-search/ @alice", f"{pattern} @bob")
                 self.assert_fails("portal lines must come last")
 
+    def test_codeowners_unicode_whitespace_fails(self):
+        lines = (
+            "/portals/dk/jobindex-search/\xa0@alice",
+            "# note\u2028/portals/dk/jobindex-search/ @alice",
+            "# note\r/portals/dk/jobindex-search/ @alice",
+        )
+        for line in lines:
+            with self.subTest(line):
+                self.write_codeowners(line)
+                self.assert_fails("whitespace other than space, tab or newline")
+
+    def test_codeowners_crlf_passes(self):
+        path = self.root / ".github" / "CODEOWNERS"
+        path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+        result = self.run_guard()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_same_board_in_two_countries_fails(self):
         self.add_portal("se", "jobindex-search")
         self.write_codeowners("/portals/dk/jobindex-search/ @alice", "/portals/se/jobindex-search/ @bob")

@@ -1,7 +1,8 @@
 # Adapted from the security-guards job in ai-job-search-dev/ai-job-search's ci.yml.
 # Portals ship CLI code and skill frontmatter that every fork user executes,
 # so this job fails PRs that add package lifecycle scripts or install config,
-# or widen a skill's allowed-tools beyond its own CLI. Honest limit: a PR can
+# widen a skill's allowed-tools beyond its own CLI, or leave a portal folder
+# without exactly one CODEOWNERS line. Honest limit: a PR can
 # edit this workflow itself, so these guards catch accidents and casual
 # attempts, not a determined author - branch protection with required checks
 # and human review remain the real backstop.
