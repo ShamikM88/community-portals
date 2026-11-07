@@ -359,7 +359,7 @@ All errors are written to **stderr** in JSON format and exit with code `1`:
 Invalid flag values (for example `--per-page 0`) fail Bunli's schema validation before the command runs, in Bunli's own shape:
 
 ```json
-{ "ok": false, "error": { "kind": "validation", "name": "BunliValidationError", "message": "Invalid option 'per-page': Number must be greater than or equal to 1", "command": "occupations", "option": "per-page" } }
+{ "ok": false, "error": { "kind": "validation", "name": "BunliValidationError", "message": "Invalid option 'per-page': Too small: expected number to be >=1", "command": "occupations", "option": "per-page" } }
 ```
 
 ---
