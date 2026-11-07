@@ -64,3 +64,18 @@ jobs:
           else
             echo "No Bun tests found for $TOOL; skipping"
           fi
+
+  cli-checks-result:
+    # One stable check name for the ruleset to require: the matrix names
+    # change with every portal added or removed.
+    name: CLI checks
+    needs: [discover-clis, cli-checks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          DISCOVER: ${{ needs.discover-clis.result }}
+          CHECKS: ${{ needs.cli-checks.result }}
+        run: |
+          echo "discover-clis: $DISCOVER, cli-checks: $CHECKS"
+          [ "$DISCOVER" = success ] && { [ "$CHECKS" = success ] || [ "$CHECKS" = skipped ]; }
