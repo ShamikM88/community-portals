@@ -25,7 +25,7 @@ portals/<country>/<board>-search/
 
 Every PR is read before it merges. The bar is not code quality. It is these five things:
 
-1. **The contract.** `search` and `detail` commands, `--format json|table|plain`, JSON errors on stderr with exit 1, backoff on 429/5xx, zero runtime dependencies, and tests. Declare any deviation in the PR ("this board has no pagination, so `--page` isn't supported").
+1. **The contract.** `search` (`--format json|table|plain`) and `detail` (`--format json|plain`) commands, JSON errors on stderr with exit 1, backoff on 429/5xx, zero runtime dependencies, and tests. Declare any deviation in the PR ("this board has no pagination, so `--page` isn't supported").
 2. **A safety pass.** No install or lifecycle scripts, no `trustedDependencies`, `bunfig.toml` or `.npmrc`, no requests beyond the board you declare, nothing reading environment variables or files beyond what the skill needs.
 3. **Honest scoping.** A personal-use note where the board's terms call for one. Anything metered or needing an API key ships `enabled: false`.
 4. **robots.txt and terms respected.** Document what the site allows and what the skill stays off. Boards that block automated access stay on the WebSearch fallback rather than getting a workaround.

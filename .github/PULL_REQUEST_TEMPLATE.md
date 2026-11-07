@@ -12,7 +12,7 @@
 
 ## The five checks
 
-- [ ] **The contract.** `search` and `detail`, `--format json|table|plain`, JSON errors on stderr with exit 1, backoff on 429/5xx, zero runtime dependencies, tests. Any deviation is declared below.
+- [ ] **The contract.** `search` (`--format json|table|plain`) and `detail` (`--format json|plain`), JSON errors on stderr with exit 1, backoff on 429/5xx, zero runtime dependencies, tests. Any deviation is declared below.
 - [ ] **A safety pass.** No install or lifecycle scripts, no `trustedDependencies`, `bunfig.toml` or `.npmrc`, no requests beyond the declared board, nothing reading environment variables or files beyond what the skill needs.
 - [ ] **Honest scoping.** A personal-use note where the board's terms call for one. Anything metered or needing an API key ships `enabled: false`.
 - [ ] **robots.txt and terms respected.** Documented what the site allows and what the skill stays off.
