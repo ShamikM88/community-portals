@@ -20,7 +20,7 @@ Every portal here is code that fork users install into `.agents/skills/` and run
 
 ### What this does not do
 
-- **The guards are loud, not impossible.** A PR can edit `tools/security_guards.py` or the workflow that runs it, so the guards catch accidents and casual attempts, not a determined author. Branch protection with required checks and human review remain the real backstop.
+- **The guards are loud, not impossible.** A PR can edit `tools/security_guards.py` or the workflow that runs it, so the guards catch accidents and casual attempts, not a determined author. They only block a merge once a ruleset on `main` makes them required checks and requires code-owner review; that ruleset and human review are the real backstop, not the guards.
 
 ## Scope notes
 
