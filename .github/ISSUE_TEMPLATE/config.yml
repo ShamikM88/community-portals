@@ -6,6 +6,9 @@ contact_links:
   - name: Security issue in a portal
     url: https://github.com/ai-job-search-dev/community-portals/security/advisories/new
     about: Report it privately, not in a public issue.
+  - name: Question
+    url: https://github.com/ai-job-search-dev/ai-job-search/discussions
+    about: Ask in the AI Job Search Discussions.
   - name: Full market or language fork
     url: https://github.com/ai-job-search-dev/ai-job-search/discussions/78
     about: Forks and adaptations are listed in Community forks & adaptations.
