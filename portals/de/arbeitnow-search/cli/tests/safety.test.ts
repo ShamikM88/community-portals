@@ -12,6 +12,12 @@ describe("redirects are checked before they are requested", () => {
     expect(nextRedirectUrl(current, "/jobs/companies/acme/other-2")).toBe("https://www.arbeitnow.com/jobs/companies/acme/other-2");
   });
 
+  test("a redirect to another Arbeitnow regional domain is allowed", () => {
+    expect(nextRedirectUrl(current, "https://www.arbeitnow.co.uk/jobs/companies/acme/other-2")).toBe(
+      "https://www.arbeitnow.co.uk/jobs/companies/acme/other-2",
+    );
+  });
+
   test("an off-host redirect, a downgrade to http, or a missing Location is refused", () => {
     expect(() => nextRedirectUrl(current, "https://example.com/x")).toThrow("Refusing");
     expect(() => nextRedirectUrl(current, "https://arbeitnow.com.evil.com/x")).toThrow("Refusing");
@@ -19,12 +25,12 @@ describe("redirects are checked before they are requested", () => {
     expect(() => nextRedirectUrl(current, null)).toThrow("Location");
   });
 
-  test("a redirect into a robots.txt-disallowed path is refused", () => {
-    expect(() => nextRedirectUrl(current, "/jobs/companies/acme/apply")).toThrow("robots.txt");
+  test("a redirect into an apply page is refused", () => {
+    expect(() => nextRedirectUrl(current, "/jobs/companies/acme/apply")).toThrow("apply page");
   });
 });
 
-describe("robots.txt disallowed apply paths", () => {
+describe("apply pages are never requested", () => {
   test("apply paths are disallowed, job pages are not", () => {
     expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/apply")).toBe(true);
     expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/some-job-1/apply")).toBe(true);

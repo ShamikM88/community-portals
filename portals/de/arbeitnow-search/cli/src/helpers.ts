@@ -22,9 +22,13 @@ export function writeError(error: string, code: string): void {
 // An honest user-agent: this is a low-volume personal tool, not a browser.
 const UA = "arbeitnow-search/1.0 (personal job-search tool, low volume)"
 
-const ALLOWED_HOSTS = new Set(["www.arbeitnow.com", "arbeitnow.com"])
+// The API returns job URLs on Arbeitnow's regional domains as well as arbeitnow.com
+// (observed 2026-11-10: .com, .co.uk, .fr, .ch, .nl), so all of them are allowed.
+const ALLOWED_HOSTS = new Set(
+  ["com", "co.uk", "fr", "ch", "nl"].flatMap((tld) => [`arbeitnow.${tld}`, `www.arbeitnow.${tld}`]),
+)
 
-/** True only for an https URL on arbeitnow.com. Every request in this CLI goes through this check. */
+/** True only for an https URL on one of Arbeitnow's own domains. Every request in this CLI goes through this check. */
 export function isArbeitnowUrl(input: string): boolean {
   try {
     const u = new URL(input)
@@ -36,7 +40,7 @@ export function isArbeitnowUrl(input: string): boolean {
 
 const MAX_REDIRECTS = 5
 
-/** robots.txt disallows the apply paths under /jobs/companies/: this CLI never requests them. */
+/** Apply pages are never requested: this tool only reads postings. (Arbeitnow's robots.txt disallowed them when this was written.) */
 export function isDisallowedPath(input: string): boolean {
   try {
     return /^\/jobs\/companies\/.*\/apply/.test(new URL(input).pathname)
@@ -47,10 +51,10 @@ export function isDisallowedPath(input: string): boolean {
 
 function assertAllowedUrl(url: string): void {
   if (!isArbeitnowUrl(url)) {
-    throw new Error("Refusing to request a host other than arbeitnow.com")
+    throw new Error("Refusing to request a host other than Arbeitnow's own domains")
   }
   if (isDisallowedPath(url)) {
-    throw new Error("Refusing a path that robots.txt disallows")
+    throw new Error("Refusing an apply page: this tool only reads postings")
   }
 }
 

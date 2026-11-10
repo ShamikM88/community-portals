@@ -2,18 +2,24 @@
 
 Public, unauthenticated endpoints. No credentials required.
 
-## robots.txt (fetched 2026-08-10)
+## robots.txt (re-checked 2026-11-10 on all five domains)
 
 ```
 User-agent: *
 Disallow:
 Disallow: /*?__hstc
-Disallow: /jobs/companies/*/apply
 ```
 
-Effectively open: nothing this skill touches is disallowed. `/jobs/companies/*/apply` is
-blocked (this skill never fetches that path — it fetches the job posting page itself, not the
-apply sub-page).
+Effectively open: the only rule is a tracking query parameter this skill never uses. An earlier
+check (2026-08-10) also listed `Disallow: /jobs/companies/*/apply`. This skill still never
+requests apply pages, since it only reads postings.
+
+## Regional domains
+
+The API's job `url` values are spread over Arbeitnow's regional domains: `arbeitnow.com`,
+`arbeitnow.co.uk`, `arbeitnow.fr`, `arbeitnow.ch` and `arbeitnow.nl` (about 60% of one page
+were not `.com`). All five serve the same robots.txt and the same posting pages, and `detail`
+accepts a URL on any of them. Any other host is refused.
 
 ## Job-board API
 
