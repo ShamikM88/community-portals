@@ -45,8 +45,10 @@ Confirmed live with real, differently-filtered results for:
 - `/jobs/asdkjaslkdjalksd-not-a-real-title` (garbage slug still 200s — StepStone does fuzzy
   matching on the slug, not exact lookup, so it degrades gracefully rather than 404ing)
 
-Slugs are built by `slugify()` in `cli/src/helpers.ts`: lowercase, German umlauts/ß
-transliterated (`ä`→`ae`, `ö`→`oe`, `ü`→`ue`, `ß`→`ss`), everything else collapsed to hyphens.
+Slugs are built by `slugify()` in `cli/src/helpers.ts`: Unicode-normalised and lowercased,
+German umlauts/ß transliterated (`ä`→`ae`, `ö`→`oe`, `ü`→`ue`, `ß`→`ss`), other accented
+letters folded to their base letter (`é`→`e`), everything else collapsed to hyphens. A query
+or location with no letters or digits is an error, not a generic search.
 
 **Trade-off:** because there is no compliant way to pass `page` or `jobage` params on this
 path, this CLI only returns StepStone's single default results page per query (StepStone's own
@@ -91,10 +93,14 @@ is the link to open in a browser.
 
 This is a React app using Emotion CSS-in-JS. Class names like `res-du9bhi`, `job-ad-display-xxeiht`
 are **generated per build and not guaranteed stable** — do not parse against them. Everything in
-this CLI keys off `data-at="..."` and `data-genesis-element="..."` attributes instead, which read
-as intentional, semantic test/analytics hooks and were stable across all pages fetched during
-development (search results, multiple queries). If StepStone ships a markup change
-that breaks parsing, check whether these attributes were renamed or restructured first.
+the parser keys off `data-at`, `data-genesis-element` and `data-testid` attributes instead (the
+card boundary is `data-at="job-item" data-testid="job-item"`, and the title link is matched
+by its attribute order), which read as intentional, semantic test/analytics hooks and were
+stable across all pages fetched during development (search results, multiple queries). Those
+patterns do assume the attribute order and adjacency seen there, so a markup change can break
+parsing. When the page has job cards but none parse, the CLI fails with `PARSE_FAILED` instead
+of reporting "No results". If that happens, check whether these attributes were renamed or
+restructured first.
 
 ## Notes
 

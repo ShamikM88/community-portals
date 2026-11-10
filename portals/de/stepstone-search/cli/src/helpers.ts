@@ -35,6 +35,27 @@ export function isStepStoneUrl(input: string): boolean {
   }
 }
 
+const MAX_REDIRECTS = 5
+
+function assertAllowedUrl(url: string): void {
+  if (!isStepStoneUrl(url)) {
+    throw new Error("Refusing to request a host other than stepstone.de")
+  }
+}
+
+/** Resolve a redirect target and check it BEFORE any request is made to it. */
+export function nextRedirectUrl(current: string, location: string | null): string {
+  if (!location) throw new Error("Redirect without a Location header")
+  const next = new URL(location, current).href
+  assertAllowedUrl(next)
+  return next
+}
+
+/** Strip terminal control characters (ESC, C0, C1, DEL) from remote text before printing it. */
+export function stripControl(text: string): string {
+  return text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+}
+
 /**
  * Fetch search-result HTML with exponential backoff on 429/5xx. Returns "" on a 404.
  *
@@ -42,24 +63,31 @@ export function isStepStoneUrl(input: string): boolean {
  * drops requests for them that do not look like a browser navigation, and this tool does not
  * work around that. Open a result's `url` in a browser to read the posting.
  */
-export async function htmlFetch(url: string): Promise<string> {
-  if (!isStepStoneUrl(url)) {
-    throw new Error("Refusing to request a host other than stepstone.de")
-  }
+export async function htmlFetch(startUrl: string): Promise<string> {
+  let url = startUrl
+  assertAllowedUrl(url)
   const maxRetries = 6
   let delay = 500
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  let retries = 0
+  let redirects = 0
+  for (;;) {
+    // Redirects are followed by hand so the target is checked before it is requested.
     const response = await fetch(url, {
       headers: {
         "User-Agent": UA,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
       },
-      redirect: "follow",
+      redirect: "manual",
       signal: AbortSignal.timeout(20000),
     })
+    if (response.status >= 300 && response.status < 400 && response.status !== 304) {
+      if (++redirects > MAX_REDIRECTS) throw new Error("Too many redirects")
+      url = nextRedirectUrl(url, response.headers.get("location"))
+      continue
+    }
     if (response.status === 429 || response.status >= 500) {
-      if (attempt === maxRetries) {
+      if (retries++ >= maxRetries) {
         throw new Error(`Request failed: ${response.status} ${response.statusText}`)
       }
       const jitter = Math.floor(Math.random() * 500)
@@ -67,17 +95,12 @@ export async function htmlFetch(url: string): Promise<string> {
       delay = Math.min(delay * 2, 8000)
       continue
     }
-    // A redirect must not take us off stepstone.de.
-    if (!isStepStoneUrl(response.url)) {
-      throw new Error("Refusing a redirect to a host other than stepstone.de")
-    }
     if (response.status === 404) return ""
     if (!response.ok) {
       throw new Error(`Request failed: ${response.status} ${response.statusText}`)
     }
     return response.text()
   }
-  throw new Error("Request failed after max retries")
 }
 
 export interface JobCard {
@@ -100,7 +123,6 @@ function numericEntity(cp: number): string {
 
 export function decodeHtmlEntities(text: string): string {
   return text
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -109,11 +131,13 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&#(\d+);/g, (_, dec) => numericEntity(parseInt(dec, 10)))
     .replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) => numericEntity(parseInt(hex, 16)))
     .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&") // last, so "&amp;lt;" stays "&lt;" instead of becoming "<"
 }
 
 /** Slugify free text into StepStone's kebab-case path-segment convention. */
 export function slugify(text: string): string {
   return text
+    .normalize("NFC")
     .trim()
     .toLowerCase()
     .replace(/ä/g, "ae")
@@ -128,10 +152,16 @@ export function slugify(text: string): string {
 
 /** Build the compliant, query-string-free search URL: /jobs/<title>[/in-<city>]. */
 export function buildSearchUrl(query: string | undefined, location: string | undefined): string {
-  const titleSlug = query ? slugify(query) : "jobs"
-  let path = `/jobs/${titleSlug || "jobs"}`
-  if (location) {
-    path += `/in-${slugify(location)}`
+  let titleSlug = "jobs"
+  if (query !== undefined) {
+    titleSlug = slugify(query)
+    if (!titleSlug) throw new Error(`--query "${query}" has no letters or digits to search for`)
+  }
+  let path = `/jobs/${titleSlug}`
+  if (location !== undefined) {
+    const citySlug = slugify(location)
+    if (!citySlug) throw new Error(`--location "${location}" has no letters or digits to search for`)
+    path += `/in-${citySlug}`
   }
   return `${BASE_URL}${path}`
 }
@@ -163,13 +193,20 @@ function windowFromMarker(chunk: string, markerIdx: number, fallbackLen = 3000):
   return chunk.slice(markerIdx, end)
 }
 
+const CARD_MARKER = /data-at="job-item" data-testid="job-item"/
+
+/** How many job-card openings the page contains, whether or not they parse. */
+export function countJobCardMarkers(html: string): number {
+  return html.split(CARD_MARKER).length - 1
+}
+
 /**
  * Parse the search-results page. Splits on each job card's opening marker and parses each
  * chunk independently so one malformed card cannot break the rest.
  */
 export function parseJobCards(html: string): JobCard[] {
   const results: JobCard[] = []
-  const chunks = html.split(/data-at="job-item" data-testid="job-item"/).slice(1)
+  const chunks = html.split(CARD_MARKER).slice(1)
 
   for (const raw of chunks) {
     const chunk = raw.slice(0, 20000)

@@ -1,4 +1,4 @@
-import { buildSearchUrl, htmlFetch, parseJobCards, writeError, type JobCard } from "../helpers.js"
+import { buildSearchUrl, countJobCardMarkers, htmlFetch, parseJobCards, stripControl, writeError, type JobCard } from "../helpers.js"
 
 export interface SearchOpts {
   query?: string
@@ -10,11 +10,11 @@ export interface SearchOpts {
 function renderTable(cards: JobCard[]): string {
   if (cards.length === 0) return "No results."
   const rows = cards.map((c) => {
-    const title = (c.title || "").slice(0, 42).padEnd(42)
-    const company = (c.company || "—").slice(0, 26).padEnd(26)
-    const loc = (c.location || "—").slice(0, 24).padEnd(24)
-    const date = c.date || "—"
-    return `${c.id.padEnd(11)} ${title} ${company} ${loc} ${date}`
+    const title = stripControl(c.title || "").slice(0, 42).padEnd(42)
+    const company = stripControl(c.company || "—").slice(0, 26).padEnd(26)
+    const loc = stripControl(c.location || "—").slice(0, 24).padEnd(24)
+    const date = stripControl(c.date || "—")
+    return `${stripControl(c.id).padEnd(11)} ${title} ${company} ${loc} ${date}`
   })
   const header =
     "ID".padEnd(11) + " " + "TITLE".padEnd(42) + " " + "COMPANY".padEnd(26) + " " + "LOCATION".padEnd(24) + " DATE"
@@ -26,18 +26,29 @@ export async function runSearch(opts: SearchOpts): Promise<number> {
     const url = buildSearchUrl(opts.query, opts.location)
     const html = await htmlFetch(url)
     let cards = parseJobCards(html)
+    const markers = countJobCardMarkers(html)
+    if (markers > 0 && cards.length === 0) {
+      writeError(
+        `The page has ${markers} job cards but none could be parsed; StepStone's markup may have changed.`,
+        "PARSE_FAILED",
+      )
+      return 1
+    }
     if (opts.limit !== undefined && opts.limit >= 0) cards = cards.slice(0, opts.limit)
 
     if (opts.format === "table") {
       process.stdout.write(renderTable(cards) + "\n")
     } else if (opts.format === "plain") {
       process.stdout.write(
-        cards
-          .map(
-            (c) =>
-              `${c.title}\n  ${c.company || "—"} · ${c.location || "—"} · ${c.date || "—"}\n  id: ${c.id}\n  ${c.url}`,
-          )
-          .join("\n\n") + "\n",
+        (cards.length === 0
+          ? "No results."
+          : cards
+              .map((c) =>
+                stripControl(
+                  `${c.title}\n  ${c.company || "—"} · ${c.location || "—"} · ${c.date || "—"}\n  id: ${c.id}\n  ${c.url}`,
+                ),
+              )
+              .join("\n\n")) + "\n",
       )
     } else {
       process.stdout.write(JSON.stringify({ meta: { count: cards.length, url }, results: cards }, null, 2) + "\n")

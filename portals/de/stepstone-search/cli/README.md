@@ -51,8 +51,9 @@ See `../SKILL.md` for the full flag reference and the personal-use note.
 | `--limit` | `-n` | Cap results emitted. |
 | `--format` | | `json` \| `table` \| `plain`. |
 
-No `--jobage` or `--page` — see `../url-reference.md` for why (robots.txt only permits a
-single, query-string-free search URL per query on this portal).
+No `--jobage` or `--page` — see `../url-reference.md` for why (robots.txt allows at most a bare
+`?q=<text>` on `/jobs/*` and no other query parameters, so this CLI uses the static path form
+with no query string at all, which leaves no way to add them).
 
 ## Why this CLI's search URL has no query string
 

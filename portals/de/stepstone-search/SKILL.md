@@ -81,7 +81,7 @@ bun run .agents/skills/stepstone-search/cli/src/cli.ts search -q "Produktmanager
 |--------|----------|
 | `json` | Default — programmatic use |
 | `table` | Quick human-readable scanning |
-| `plain` | Plain-text lines, one result per line |
+| `plain` | Plain text, four lines per result (title, company · location · date, id, url) |
 
 All errors are written to **stderr** as `{ "error": "...", "code": "..." }` and the process exits with code `1`.
 
