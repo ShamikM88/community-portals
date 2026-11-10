@@ -8,32 +8,8 @@
 
 import { runSearch, type SearchOpts } from "./commands/search.js"
 import { runDetail, type DetailOpts } from "./commands/detail.js"
-
-interface Flags {
-  _: string[]
-  [k: string]: string | boolean | string[]
-}
-
-function parseFlags(argv: string[]): Flags {
-  const flags: Flags = { _: [] }
-  const alias: Record<string, string> = { q: "query", l: "location", n: "limit" }
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i]!
-    if (a.startsWith("--") || a.startsWith("-")) {
-      const key = alias[a.replace(/^-+/, "")] ?? a.replace(/^-+/, "")
-      const next = argv[i + 1]
-      if (next === undefined || next.startsWith("-")) {
-        flags[key] = true
-      } else {
-        flags[key] = next
-        i++
-      }
-    } else {
-      ;(flags._ as string[]).push(a)
-    }
-  }
-  return flags
-}
+import { ArgError, parseArgs, type ParsedArgs } from "./args.js"
+import { writeError } from "./helpers.js"
 
 const HELP = `arbeitnow-cli — search jobs on Arbeitnow (Germany-focused, incl. English-speaking / remote)
 
@@ -65,61 +41,50 @@ EXAMPLES
 `
 
 async function main(): Promise<number> {
-  const argv = process.argv.slice(2)
-  const flags = parseFlags(argv)
-  const cmd = (flags._ as string[])[0]
-
-  if (!cmd || flags.help || flags.h) {
-    process.stdout.write(HELP)
-    return cmd ? 0 : 1
+  let args: ParsedArgs
+  try {
+    args = parseArgs(process.argv.slice(2))
+  } catch (e) {
+    if (e instanceof ArgError) {
+      writeError(e.message, e.code)
+      return 1
+    }
+    throw e
   }
 
-  if (cmd === "search") {
-    const fmt = (flags.format as string) || "json"
+  if (args.help) {
+    process.stdout.write(HELP)
+    return 0
+  }
+  if (!args.command) {
+    writeError("No command given. Use search or detail, or --help.", "NO_COMMAND")
+    return 1
+  }
 
-    const parseIntFlag = (name: string, raw: string | boolean | string[]): number | null => {
-      const val = parseInt(raw as string, 10)
-      if (isNaN(val)) {
-        process.stderr.write(JSON.stringify({ error: `--${name} must be a number, got "${raw}"`, code: "BAD_ARG" }) + "\n")
-        return null
-      }
-      return val
-    }
-
-    for (const name of ["jobage", "page", "limit"] as const) {
-      if (flags[name] !== undefined) {
-        const v = parseIntFlag(name, flags[name]!)
-        if (v === null) return 1
-        flags[name] = String(v)
-      }
-    }
-
+  if (args.command === "search") {
+    const f = args.flags
     const opts: SearchOpts = {
-      query: typeof flags.query === "string" ? flags.query : undefined,
-      location: typeof flags.location === "string" ? flags.location : undefined,
-      jobageDays: flags.jobage ? parseInt(flags.jobage as string, 10) : undefined,
-      page: flags.page ? Math.max(1, parseInt(flags.page as string, 10)) : 1,
-      limit: flags.limit ? parseInt(flags.limit as string, 10) : undefined,
-      format: (["json", "table", "plain"].includes(fmt) ? fmt : "json") as SearchOpts["format"],
+      query: f.query as string | undefined,
+      location: f.location as string | undefined,
+      jobageDays: f.jobage as number | undefined,
+      page: (f.page as number | undefined) ?? 1,
+      limit: f.limit as number | undefined,
+      format: args.format as SearchOpts["format"],
     }
     return runSearch(opts)
   }
 
-  if (cmd === "detail") {
-    const id = (flags._ as string[])[1]
+  if (args.command === "detail") {
+    const id = args.positional[0]
     if (!id) {
-      process.stderr.write(JSON.stringify({ error: "detail requires a <url>", code: "NO_ID" }) + "\n")
+      writeError("detail requires a <url>", "NO_ID")
       return 1
     }
-    const fmt = (flags.format as string) || "json"
-    const opts: DetailOpts = {
-      id,
-      format: (fmt === "plain" ? "plain" : "json") as DetailOpts["format"],
-    }
+    const opts: DetailOpts = { id, format: args.format as DetailOpts["format"] }
     return runDetail(opts)
   }
 
-  process.stderr.write(JSON.stringify({ error: `Unknown command "${cmd}"`, code: "BAD_CMD" }) + "\n")
+  writeError(`Unknown command "${args.command}"`, "BAD_CMD")
   return 1
 }
 

@@ -1,4 +1,4 @@
-import { htmlFetch, isArbeitnowUrl, parseJobDetail, writeError } from "../helpers.js"
+import { htmlFetch, isArbeitnowUrl, isDisallowedPath, parseJobDetail, stripControl, writeError } from "../helpers.js"
 
 export interface DetailOpts {
   id: string
@@ -6,16 +6,19 @@ export interface DetailOpts {
 }
 
 function toUrl(input: string): string | null {
-  if (input.startsWith("http")) return isArbeitnowUrl(input) ? input : null
-  if (input.startsWith("/jobs/companies/")) return `https://www.arbeitnow.com${input}`
-  return null
+  const url = input.startsWith("http")
+    ? input
+    : input.startsWith("/jobs/companies/")
+      ? `https://www.arbeitnow.com${input}`
+      : null
+  return url && isArbeitnowUrl(url) && !isDisallowedPath(url) ? url : null
 }
 
 export async function runDetail(opts: DetailOpts): Promise<number> {
   const url = toUrl(opts.id)
   if (!url) {
     writeError(
-      `"${opts.id}" is not an arbeitnow.com job URL. Arbeitnow job slugs alone can't be turned into a URL (the URL also needs the company slug) — pass the full "url" field from a search result instead.`,
+      `"${opts.id}" is not an arbeitnow.com job URL (apply pages are excluded). Arbeitnow job slugs alone can't be turned into a URL (the URL also needs the company slug) — pass the full "url" field from a search result instead.`,
       "BAD_ID",
     )
     return 1
@@ -46,7 +49,7 @@ export async function runDetail(opts: DetailOpts): Promise<number> {
         "",
         `URL: ${job.url}`,
       ].filter((l) => l !== "")
-      process.stdout.write(lines.join("\n") + "\n")
+      process.stdout.write(stripControl(lines.join("\n"), true) + "\n")
     } else {
       process.stdout.write(JSON.stringify(job, null, 2) + "\n")
     }

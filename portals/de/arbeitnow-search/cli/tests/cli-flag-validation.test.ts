@@ -2,9 +2,31 @@ import { describe, expect, test } from "bun:test";
 import { runCLI } from "./helpers";
 
 describe("arbeitnow-cli error contract", () => {
-  test("no command prints help and fails", async () => {
+  test("no command fails with a JSON error on stderr and nothing on stdout", async () => {
     const result = await runCLI([]);
     expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(JSON.parse(result.stderr).code).toBe("NO_COMMAND");
+  });
+
+  test("--help prints the help text to stdout and exits 0", async () => {
+    const result = await runCLI(["--help"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("USAGE");
+    expect(result.stderr).toBe("");
+  });
+
+  test("an unsupported --format fails before making a request", async () => {
+    const result = await runCLI(["search", "--format", "tabl"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(JSON.parse(result.stderr).code).toBe("BAD_ARG");
+  });
+
+  test("a value-taking flag with no value fails instead of dropping the filter", async () => {
+    const result = await runCLI(["search", "--query"]);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stderr).code).toBe("BAD_ARG");
   });
 
   test("detail without a url fails with JSON on stderr", async () => {

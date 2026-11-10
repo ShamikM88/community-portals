@@ -34,20 +34,62 @@ export function isArbeitnowUrl(input: string): boolean {
   }
 }
 
-async function fetchWithBackoff(url: string, accept: string): Promise<Response> {
+const MAX_REDIRECTS = 5
+
+/** robots.txt disallows the apply paths under /jobs/companies/: this CLI never requests them. */
+export function isDisallowedPath(input: string): boolean {
+  try {
+    return /^\/jobs\/companies\/.*\/apply/.test(new URL(input).pathname)
+  } catch {
+    return true
+  }
+}
+
+function assertAllowedUrl(url: string): void {
   if (!isArbeitnowUrl(url)) {
     throw new Error("Refusing to request a host other than arbeitnow.com")
   }
+  if (isDisallowedPath(url)) {
+    throw new Error("Refusing a path that robots.txt disallows")
+  }
+}
+
+/** Resolve a redirect target and check it BEFORE any request is made to it. */
+export function nextRedirectUrl(current: string, location: string | null): string {
+  if (!location) throw new Error("Redirect without a Location header")
+  const next = new URL(location, current).href
+  assertAllowedUrl(next)
+  return next
+}
+
+/** Strip terminal control characters (ESC, C0, C1, DEL) from remote text before printing it. */
+export function stripControl(text: string, keepNewlines = false): string {
+  return keepNewlines
+    ? text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "")
+    : text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+}
+
+async function fetchWithBackoff(startUrl: string, accept: string): Promise<Response> {
+  let url = startUrl
+  assertAllowedUrl(url)
   const maxRetries = 6
   let delay = 500
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  let retries = 0
+  let redirects = 0
+  for (;;) {
+    // Redirects are followed by hand so the target is checked before it is requested.
     const response = await fetch(url, {
       headers: { "User-Agent": UA, Accept: accept },
-      redirect: "follow",
+      redirect: "manual",
       signal: AbortSignal.timeout(15000),
     })
+    if (response.status >= 300 && response.status < 400 && response.status !== 304) {
+      if (++redirects > MAX_REDIRECTS) throw new Error("Too many redirects")
+      url = nextRedirectUrl(url, response.headers.get("location"))
+      continue
+    }
     if (response.status === 429 || response.status >= 500) {
-      if (attempt === maxRetries) {
+      if (retries++ >= maxRetries) {
         throw new Error(`Request failed: ${response.status} ${response.statusText}`)
       }
       const jitter = Math.floor(Math.random() * 500)
@@ -55,13 +97,8 @@ async function fetchWithBackoff(url: string, accept: string): Promise<Response> 
       delay = Math.min(delay * 2, 8000)
       continue
     }
-    // A redirect must not take us off arbeitnow.com.
-    if (!isArbeitnowUrl(response.url)) {
-      throw new Error("Refusing a redirect to a host other than arbeitnow.com")
-    }
     return response
   }
-  throw new Error("Request failed after max retries")
 }
 
 interface ApiJob {
@@ -159,7 +196,6 @@ const NAMED_ENTITIES: Record<string, string> = {
 
 export function decodeHtmlEntities(text: string): string {
   return text
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -169,6 +205,7 @@ export function decodeHtmlEntities(text: string): string {
     .replace(/&#[xX]([0-9a-fA-F]+);/g, (_, hex) => numericEntity(parseInt(hex, 16)))
     .replace(/&([a-zA-Z]+);/g, (full, name) => NAMED_ENTITIES[name] ?? full)
     .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&") // last, so "&amp;lt;" stays "&lt;" instead of becoming "<"
 }
 
 /** Convert the API's raw description HTML to clean plain text with paragraph breaks. */

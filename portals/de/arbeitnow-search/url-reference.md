@@ -53,8 +53,8 @@ response embeds its own terms:
 }
 ```
 
-- `description` is the **full** job description HTML (confirmed: 10k+ characters on real
-  postings) — no separate detail fetch is needed to get the full text from `search` output.
+- `description` is the **full** job description HTML in the API (confirmed: 10k+ characters on
+  real postings). `search` output omits it; use `detail` to read the text.
 - `created_at` is a **Unix timestamp** (seconds), always present, always reliable — unlike
   StepStone's relative German time strings, this converts cleanly to an ISO date.
 - `location` can be an **empty string** for fully-remote/unlocated postings — mapped to `null`.

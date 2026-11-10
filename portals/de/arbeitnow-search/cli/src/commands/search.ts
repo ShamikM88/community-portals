@@ -1,4 +1,4 @@
-import { fetchApiPage, filterJobs, extractMeta, writeError, type JobCard, type ListOpts } from "../helpers.js"
+import { fetchApiPage, filterJobs, extractMeta, stripControl, writeError, type JobCard, type ListOpts } from "../helpers.js"
 
 export interface SearchOpts extends ListOpts {
   page: number
@@ -8,11 +8,11 @@ export interface SearchOpts extends ListOpts {
 function renderTable(cards: JobCard[]): string {
   if (cards.length === 0) return "No results."
   const rows = cards.map((c) => {
-    const title = (c.title || "").slice(0, 42).padEnd(42)
-    const company = (c.company || "—").slice(0, 26).padEnd(26)
-    const loc = (c.location || "—").slice(0, 24).padEnd(24)
-    const date = (c.date || "—").slice(0, 10)
-    return `${c.id.slice(0, 30).padEnd(31)} ${title} ${company} ${loc} ${date}`
+    const title = stripControl(c.title || "").slice(0, 42).padEnd(42)
+    const company = stripControl(c.company || "—").slice(0, 26).padEnd(26)
+    const loc = stripControl(c.location || "—").slice(0, 24).padEnd(24)
+    const date = stripControl(c.date || "—").slice(0, 10)
+    return `${stripControl(c.id).slice(0, 30).padEnd(31)} ${title} ${company} ${loc} ${date}`
   })
   const header =
     "ID".padEnd(31) + " " + "TITLE".padEnd(42) + " " + "COMPANY".padEnd(26) + " " + "LOCATION".padEnd(24) + " DATE"
@@ -33,12 +33,16 @@ export async function runSearch(opts: SearchOpts): Promise<number> {
       process.stdout.write(renderTable(cards) + "\n")
     } else if (opts.format === "plain") {
       process.stdout.write(
-        cards
-          .map(
-            (c) =>
-              `${c.title}\n  ${c.company || "—"} · ${c.location || "—"} · ${c.date || "—"}\n  id: ${c.id}\n  ${c.url}`,
-          )
-          .join("\n\n") + "\n",
+        (cards.length === 0
+          ? "No results."
+          : cards
+              .map((c) =>
+                stripControl(
+                  `${c.title}\n  ${c.company || "—"} · ${c.location || "—"} · ${c.date || "—"}\n  id: ${c.id}\n  ${c.url}`,
+                  true,
+                ),
+              )
+              .join("\n\n")) + "\n",
       )
     } else {
       process.stdout.write(
