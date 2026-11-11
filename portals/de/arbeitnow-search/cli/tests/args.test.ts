@@ -47,6 +47,19 @@ describe("parseArgs", () => {
     expect(fails(["search", "--page", "-2"])).toContain("--page needs a value");
   });
 
+  test("a zero limit is valid (no results), zero page or jobage is not", () => {
+    expect(parseArgs(["search", "--limit", "0"]).flags.limit).toBe(0);
+    expect(fails(["search", "--page", "0"])).toContain("--page must be a whole number of 1 or more");
+    expect(fails(["search", "--jobage", "0"])).toContain("--jobage");
+  });
+
+  test("names like toString or constructor are never treated as commands or flags", () => {
+    expect(parseArgs(["toString"]).command).toBe("toString");
+    expect(parseArgs(["toString"]).positional).toEqual([]);
+    expect(fails(["search", "--constructor", "x"])).toContain("Unknown flag");
+    expect(fails(["search", "--toString", "x"])).toContain("Unknown flag");
+  });
+
   test("a value-taking flag without a value is an error, not a dropped filter", () => {
     expect(fails(["search", "--query"])).toContain("--query needs a value");
     expect(fails(["search", "-q", "--format", "json"])).toContain("--query needs a value");

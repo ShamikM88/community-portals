@@ -10,7 +10,8 @@ Disallow:
 Disallow: /*?__hstc
 ```
 
-Effectively open: the only rule is a tracking query parameter this skill never uses. An earlier
+Effectively open: the only rule is a tracking query parameter. This skill never uses it and
+refuses any URL that carries it. An earlier
 check (2026-08-10) also listed `Disallow: /jobs/companies/*/apply`. This skill still never
 requests apply pages, since it only reads postings.
 

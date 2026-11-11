@@ -40,10 +40,15 @@ export function isArbeitnowUrl(input: string): boolean {
 
 const MAX_REDIRECTS = 5
 
-/** Apply pages are never requested: this tool only reads postings. (Arbeitnow's robots.txt disallowed them when this was written.) */
+/**
+ * URLs this tool never requests: apply pages (it only reads postings) and URLs carrying the
+ * `?__hstc` tracking parameter that Arbeitnow's robots.txt disallows (`/*?__hstc`). An older
+ * robots.txt also disallowed the apply pages.
+ */
 export function isDisallowedPath(input: string): boolean {
   try {
-    return /^\/jobs\/companies\/.*\/apply/.test(new URL(input).pathname)
+    const u = new URL(input)
+    return /^\/jobs\/companies\/.*\/apply/.test(u.pathname) || u.search.startsWith("?__hstc")
   } catch {
     return true
   }
@@ -54,7 +59,7 @@ function assertAllowedUrl(url: string): void {
     throw new Error("Refusing to request a host other than Arbeitnow's own domains")
   }
   if (isDisallowedPath(url)) {
-    throw new Error("Refusing an apply page: this tool only reads postings")
+    throw new Error("Refusing an apply page or a tracking-parameter URL: this tool only reads postings")
   }
 }
 

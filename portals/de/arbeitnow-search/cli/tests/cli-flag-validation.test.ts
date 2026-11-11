@@ -9,6 +9,12 @@ describe("arbeitnow-cli error contract", () => {
     expect(JSON.parse(result.stderr).code).toBe("NO_COMMAND");
   });
 
+  test("a command named like an inherited property is an unknown command, not a crash", async () => {
+    const result = await runCLI(["toString"]);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stderr).code).toBe("BAD_CMD");
+  });
+
   test("--help prints the help text to stdout and exits 0", async () => {
     const result = await runCLI(["--help"]);
     expect(result.exitCode).toBe(0);

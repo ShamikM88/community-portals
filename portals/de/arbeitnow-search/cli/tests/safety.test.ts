@@ -38,6 +38,17 @@ describe("apply pages are never requested", () => {
     expect(isDisallowedPath("https://www.arbeitnow.com/api/job-board-api?page=1")).toBe(false);
   });
 
+  test("URLs with the ?__hstc tracking parameter are disallowed, other query strings are not", () => {
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/some-job-1?__hstc=abc")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/some-job-1?utm_source=x")).toBe(false);
+  });
+
+  test("detail refuses a tracking-parameter URL before making any request", async () => {
+    const result = await runCLI(["detail", "https://www.arbeitnow.com/jobs/companies/acme/some-job-1?__hstc=abc"]);
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stderr).code).toBe("BAD_ID");
+  });
+
   test("detail refuses an apply URL before making any request", async () => {
     const result = await runCLI(["detail", "https://www.arbeitnow.com/jobs/companies/acme/apply"]);
     expect(result.exitCode).toBe(1);

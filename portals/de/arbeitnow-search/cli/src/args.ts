@@ -24,6 +24,9 @@ const SPECS: Record<string, CommandSpec> = {
 
 const ALIASES: Record<string, string> = { q: "query", l: "location", n: "limit" }
 
+// Smallest allowed value per numeric flag. A zero limit is valid: it asks for no results.
+const MIN: Record<string, number> = { page: 1, jobage: 1, limit: 0 }
+
 export interface ParsedArgs {
   command?: string
   positional: string[]
@@ -44,7 +47,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     throw new ArgError(`Put the command first (search or detail), got "${first}"`)
   }
   out.command = first
-  const spec = SPECS[first]
+  // Own properties only, so names like "toString" are unknown commands, not inherited functions.
+  const spec = Object.hasOwn(SPECS, first) ? SPECS[first] : undefined
   if (!spec) return out // the caller reports the unknown command
 
   for (let i = 1; i < argv.length; i++) {
@@ -57,8 +61,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     const eq = body.indexOf("=")
     const rawName = eq >= 0 ? body.slice(0, eq) : body
     let value: string | undefined = eq >= 0 ? body.slice(eq + 1) : undefined
-    const name = ALIASES[rawName] ?? rawName
-    const kind = name === "format" ? "format" : spec.flags[name]
+    const name = Object.hasOwn(ALIASES, rawName) ? ALIASES[rawName]! : rawName
+    const kind = name === "format" ? "format" : Object.hasOwn(spec.flags, name) ? spec.flags[name] : undefined
     if (!kind) throw new ArgError(`Unknown flag "${tok}" for ${first}`)
     if (value === undefined) {
       const next = argv[i + 1]
@@ -74,8 +78,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
       }
       out.format = value
     } else if (kind === "int") {
-      if (!/^\d+$/.test(value) || Number(value) < 1) {
-        throw new ArgError(`--${name} must be a whole number of 1 or more, got "${value}"`)
+      const min = MIN[name] ?? 1
+      if (!/^\d+$/.test(value) || Number(value) < min) {
+        throw new ArgError(`--${name} must be a whole number of ${min} or more, got "${value}"`)
       }
       out.flags[name] = Number(value)
     } else {
