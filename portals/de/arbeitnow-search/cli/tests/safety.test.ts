@@ -79,7 +79,12 @@ describe("stripControl", () => {
 describe("cleanDeep", () => {
   test("strips C1 and C0 controls from every string, including nested ones", () => {
     const cleaned = cleanDeep({ title: "a\u009bb\u001bc", nested: { list: ["x\u009by"] }, n: 3 });
-    expect(JSON.stringify(cleaned)).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    // Check the raw strings: JSON.stringify would escape a leftover ESC and hide it from the regex.
+    for (const text of [cleaned.title, cleaned.nested.list[0]]) {
+      expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    }
+    expect(cleaned.title.startsWith("a")).toBe(true);
+    expect(cleaned.title.endsWith("c")).toBe(true);
     expect(cleaned.n).toBe(3);
   });
 

@@ -21,8 +21,10 @@ The API's job `url` values are spread over Arbeitnow's regional domains: `arbeit
 `arbeitnow.co.uk`, `arbeitnow.fr`, `arbeitnow.ch` and `arbeitnow.nl` (about 60% of one page
 were not `.com`). All five served the same robots.txt and the same posting pages when checked, and
 `detail` accepts a URL on any of them. Any other host is refused. A regional domain may
-answer some networks with a bot challenge instead of the page; `detail` then fails with
-`DETAIL_FAILED` and the HTTP status, and nothing is retried around it.
+answer some networks with a bot challenge instead of the page. `detail` retries 429 and 5xx
+responses, reports `NOT_FOUND` for a 404 and `DETAIL_FAILED` for other non-OK statuses, and
+reports `PARSE_FAILED` when a 200 challenge page has no JobPosting data. It does not try another
+domain.
 
 ## Job-board API
 

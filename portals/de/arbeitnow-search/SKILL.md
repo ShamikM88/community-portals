@@ -50,11 +50,11 @@ Key flags:
 - `--query <text>` / `-q <text>` — keywords, matched against title, company name, and tags.
 - `--location <text>` / `-l <text>` — substring match against location, e.g. `"Berlin"`.
 - `--jobage <days>` — only postings within the last N days.
-- `--page <n>` — 1-indexed server page (the API sets the page size, see `meta.perPage`; reverse-chronological). Default 1.
+- `--page <n>` — 1-indexed server page, 1 to 1000 (the API sets the page size; the CLI's JSON reports it as `meta.perPage`, the raw API as `meta.per_page`; reverse-chronological). Default 1.
 - `--limit <n>` / `-n <n>` — cap results emitted (client-side, after filtering).
 - `--format json|table|plain` — default `json`.
 
-Query syntax: no phrase quoting and no OR. The whole `--query` is one case-insensitive substring matched against title, company name and tags, so a multi-word query matches only that exact contiguous text, and quote characters count as text (a quoted query matches nothing).
+Query syntax: no phrase quoting and no OR. The whole `--query` is one case-insensitive substring matched against title, company name and tags, so a multi-word query matches only that exact contiguous text, and literal quote characters are part of the text, so a query containing them will usually match nothing. Shell quotes that keep a multi-word query together are removed before the CLI sees it.
 
 > **Important: this API has no server-side search** (verified — see `url-reference.md`). Every
 > flag above except `--page` filters the ONE page fetched, client-side. To search more broadly
