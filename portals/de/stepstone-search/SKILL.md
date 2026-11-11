@@ -50,6 +50,10 @@ Key flags:
 - `--limit <n>` / `-n <n>` — cap results emitted (client-side).
 - `--format json|table|plain` — default `json`.
 
+Query syntax: no phrase quoting and no OR. The query becomes a URL slug (quotes and punctuation turn into hyphens, so `"product owner"` and `product owner` search the same way, and a word like OR is just another word in the slug), which StepStone fuzzy-matches.
+
+> **Categories that are refused.** StepStone's robots.txt disallows the category paths `/jobs/vollzeit/`, `/jobs/home-office/` and `/jobs/teilzeit/` without a city, so a query that is only `Vollzeit`, `Home Office` or (with no `--location`) `Teilzeit` fails with `BAD_ARG` instead of requesting them. Add words, for example `"Product Owner Vollzeit"`.
+
 > **No `--jobage` or `--page`.** StepStone's robots.txt only allows a single, query-string-free
 > search URL per query (see `url-reference.md`) — there is no robots.txt-compliant way to
 > request a second page or filter by posting age via URL parameters on this path. Each search

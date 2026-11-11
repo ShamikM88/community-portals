@@ -1,13 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildSearchUrl,
+  cleanDeep,
   countJobCardMarkers,
   decodeHtmlEntities,
+  isRobotsAllowedPath,
   nextRedirectUrl,
   parseJobCards,
+  SearchInputError,
   slugify,
   stripControl,
 } from "../src/helpers";
+import { renderPlain } from "../src/commands/search";
+import { runCLI } from "./helpers";
 
 describe("redirects are checked before they are requested", () => {
   const current = "https://www.stepstone.de/jobs/product-owner/in-berlin";
@@ -24,6 +29,61 @@ describe("redirects are checked before they are requested", () => {
     expect(() => nextRedirectUrl(current, "https://stepstone.de.evil.com/x")).toThrow("Refusing");
     expect(() => nextRedirectUrl(current, "http://www.stepstone.de/x")).toThrow("Refusing");
     expect(() => nextRedirectUrl(current, null)).toThrow("Location");
+  });
+});
+
+describe("robots.txt paths", () => {
+  test("ordinary search paths are allowed, including teilzeit with a city", () => {
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/product-owner")).toBe(true);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/product-owner/in-berlin")).toBe(true);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/teilzeit/in-berlin")).toBe(true);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/product-owner-vollzeit")).toBe(true);
+  });
+
+  test("the disallowed categories, other routes and any query string are refused", () => {
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/vollzeit/in-berlin")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/vollzeit")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/home-office/in-berlin")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/teilzeit")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/public-api/resultlist/")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/search-results")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/listing/x")).toBe(false);
+    expect(isRobotsAllowedPath("https://www.stepstone.de/jobs/product-owner?q=x")).toBe(false);
+  });
+
+  test("a redirect to a disallowed path on the same host is refused before it is requested", () => {
+    const current = "https://www.stepstone.de/jobs/product-owner/in-berlin";
+    expect(() => nextRedirectUrl(current, "/public-api/resultlist/")).toThrow("robots.txt");
+    expect(() => nextRedirectUrl(current, "/jobs/vollzeit/in-berlin")).toThrow("robots.txt");
+    expect(() => nextRedirectUrl(current, "/jobs/product-owner?x=1")).toThrow("robots.txt");
+  });
+
+  test("a search that would build a disallowed URL is a BAD_ARG error, not a request", async () => {
+    expect(() => buildSearchUrl("Vollzeit", "Berlin")).toThrow(SearchInputError);
+    expect(() => buildSearchUrl("Home Office", "Berlin")).toThrow("robots.txt");
+    expect(() => buildSearchUrl("Teilzeit", undefined)).toThrow("give a --location");
+    expect(buildSearchUrl("Teilzeit", "Berlin")).toBe("https://www.stepstone.de/jobs/teilzeit/in-berlin");
+    const result = await runCLI(["search", "--query", "Vollzeit"]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(JSON.parse(result.stderr).code).toBe("BAD_ARG");
+  });
+});
+
+describe("cleanDeep", () => {
+  test("strips C1 and C0 controls from every string, including nested ones", () => {
+    const cleaned = cleanDeep({ title: "a\u009bb\u001bc", nested: { list: ["x\u009by"] }, n: 3 });
+    expect(JSON.stringify(cleaned)).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    expect(cleaned.n).toBe(3);
+  });
+});
+
+describe("plain output", () => {
+  test("keeps four lines per result and strips controls inside each field", () => {
+    const out = renderPlain([{ id: "1", title: "T\u001b[31m", company: "C", location: "L", date: "vor 1 Tag", url: "https://www.stepstone.de/x" }]);
+    expect(out.split("\n")).toHaveLength(4);
+    expect(out).not.toMatch(/\u001b/);
+    expect(renderPlain([])).toBe("No results.");
   });
 });
 
@@ -60,6 +120,18 @@ describe("a markup change is loud, not 'no results'", () => {
     const html = '<div data-at="job-item" data-testid="job-item"><span>layout changed</span></div>'.repeat(3);
     expect(countJobCardMarkers(html)).toBe(3);
     expect(parseJobCards(html)).toHaveLength(0);
+  });
+
+  test("reversed attribute order is still counted and parsed as a card boundary", () => {
+    const reversed = '<div data-testid="job-item" data-at="job-item"><span>layout changed</span></div>';
+    expect(countJobCardMarkers(reversed)).toBe(1);
+    expect(countJobCardMarkers('<div data-at="job-item" class="x">only one attribute</div>')).toBe(1);
+  });
+
+  test("a CSS selector that mentions the attribute is not a card", () => {
+    const css = '<style data-emotion="res x">.res-a [data-genesis-element="CARD"],.res-a [data-at="job-item"]{border-radius:4px;}</style>';
+    expect(countJobCardMarkers(css)).toBe(0);
+    expect(countJobCardMarkers(css + '<article id="job-item-1" data-at="job-item" data-testid="job-item"></article>')).toBe(1);
   });
 
   test("a page with no cards at all has zero markers", () => {

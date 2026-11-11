@@ -37,9 +37,40 @@ export function isStepStoneUrl(input: string): boolean {
 
 const MAX_REDIRECTS = 5
 
+/** Raised for a search the caller asked for that this tool will not make. Reported as BAD_ARG. */
+export class SearchInputError extends Error {}
+
+// Category paths StepStone's robots.txt disallows (checked live 2026-11-11, group `User-agent: *`):
+// Disallow: /jobs/vollzeit/, /jobs/teilzeit/ (but Allow: /jobs/teilzeit/in-*), /jobs/home-office/.
+const DISALLOWED_CATEGORIES = new Set(["vollzeit", "home-office"])
+
+/**
+ * True only for the one URL shape this tool requests, and only when robots.txt allows it:
+ * /jobs/<slug>[/in-<city>] with no query string, not one of the disallowed category paths.
+ * Everything else (/public-api/, /search-results, /listing, any query string) is refused.
+ */
+export function isRobotsAllowedPath(input: string): boolean {
+  let u: URL
+  try {
+    u = new URL(input)
+  } catch {
+    return false
+  }
+  if (u.search) return false
+  const m = u.pathname.match(/^\/jobs\/([a-z0-9-]+)(\/in-[a-z0-9-]+)?\/?$/)
+  if (!m) return false
+  const first = m[1]!
+  if (DISALLOWED_CATEGORIES.has(first)) return false
+  if (first === "teilzeit" && !m[2]) return false
+  return true
+}
+
 function assertAllowedUrl(url: string): void {
   if (!isStepStoneUrl(url)) {
     throw new Error("Refusing to request a host other than stepstone.de")
+  }
+  if (!isRobotsAllowedPath(url)) {
+    throw new Error("Refusing a URL that StepStone's robots.txt disallows")
   }
 }
 
@@ -49,6 +80,16 @@ export function nextRedirectUrl(current: string, location: string | null): strin
   const next = new URL(location, current).href
   assertAllowedUrl(next)
   return next
+}
+
+/** Strip terminal control characters (ESC, C0, C1, DEL) from every string in a value, before JSON output. */
+export function cleanDeep<T>(value: T): T {
+  if (typeof value === "string") return stripControl(value) as T
+  if (Array.isArray(value)) return value.map((v) => cleanDeep(v)) as T
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cleanDeep(v)])) as T
+  }
+  return value
 }
 
 /** Strip terminal control characters (ESC, C0, C1, DEL) from remote text before printing it. */
@@ -155,15 +196,21 @@ export function buildSearchUrl(query: string | undefined, location: string | und
   let titleSlug = "jobs"
   if (query !== undefined) {
     titleSlug = slugify(query)
-    if (!titleSlug) throw new Error(`--query "${query}" has no letters or digits to search for`)
+    if (!titleSlug) throw new SearchInputError(`--query "${query}" has no letters or digits to search for`)
   }
   let path = `/jobs/${titleSlug}`
   if (location !== undefined) {
     const citySlug = slugify(location)
-    if (!citySlug) throw new Error(`--location "${location}" has no letters or digits to search for`)
+    if (!citySlug) throw new SearchInputError(`--location "${location}" has no letters or digits to search for`)
     path += `/in-${citySlug}`
   }
-  return `${BASE_URL}${path}`
+  const url = `${BASE_URL}${path}`
+  if (!isRobotsAllowedPath(url)) {
+    throw new SearchInputError(
+      `StepStone's robots.txt disallows searching the "${titleSlug}" category on its own. Add more words to --query (for example "Product Owner ${titleSlug}")${titleSlug === "teilzeit" ? " or give a --location" : ""}.`,
+    )
+  }
+  return url
 }
 
 /**
@@ -193,11 +240,19 @@ function windowFromMarker(chunk: string, markerIdx: number, fallbackLen = 3000):
   return chunk.slice(markerIdx, end)
 }
 
-const CARD_MARKER = /data-at="job-item" data-testid="job-item"/
+// The card boundary, in either attribute order, so a reordered markup is still parsed.
+const CARD_MARKER = /data-at="job-item"\s+data-testid="job-item"|data-testid="job-item"\s+data-at="job-item"/
 
-/** How many job-card openings the page contains, whether or not they parse. */
+/**
+ * How many job-card openings the page contains, whether or not they parse. Deliberately looser
+ * than the parser: counts either attribute on its own, so a markup change that breaks parsing
+ * still shows up as "cards present, none parsed". Only attributes inside an HTML tag count: the
+ * page's inline CSS also mentions `[data-at="job-item"]` as a selector, which is not a card.
+ */
 export function countJobCardMarkers(html: string): number {
-  return html.split(CARD_MARKER).length - 1
+  const inTag = (attr: string) =>
+    (html.match(new RegExp(`<[^<>]*\\b${attr}="job-item"[^<>]*>`, "g")) ?? []).length
+  return Math.max(inTag("data-at"), inTag("data-testid"))
 }
 
 /**

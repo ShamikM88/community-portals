@@ -39,7 +39,7 @@ describe("stepstone-cli error contract", () => {
     const result = await runCLI(["search", "--query", "???"]);
     expect(result.exitCode).toBe(1);
     expect(result.stdout).toBe("");
-    expect(JSON.parse(result.stderr).code).toBe("SEARCH_FAILED");
+    expect(JSON.parse(result.stderr).code).toBe("BAD_ARG");
   });
 
   test("detail is not supported and says so with JSON on stderr", async () => {

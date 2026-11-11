@@ -53,6 +53,16 @@ describe("parseArgs", () => {
     expect(fails(["search", "--toString", "x"])).toContain("Unknown flag");
   });
 
+  test("absurdly long digit strings are rejected, not turned into Infinity", () => {
+    expect(fails(["search", "--limit", "9".repeat(400)])).toContain("--limit must be a whole number from 0 to 10000");
+    expect(fails(["search", "--limit", "10001"])).toContain("--limit");
+  });
+
+  test("an empty value is an error, not a silently dropped filter", () => {
+    expect(fails(["search", "--query="])).toContain("--query needs a non-empty value");
+    expect(fails(["search", "--location="])).toContain("--location needs a non-empty value");
+  });
+
   test("a value-taking flag without a value is an error, not a dropped filter", () => {
     expect(fails(["search", "--query"])).toContain("--query needs a value");
     expect(fails(["search", "-q", "--format", "json"])).toContain("--query needs a value");

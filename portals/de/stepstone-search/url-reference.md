@@ -3,11 +3,17 @@
 Public, unauthenticated pages used by this skill. No credentials required. **All URLs are
 static, query-string-free paths** — see "Why no query string?" below for the reason.
 
-## robots.txt summary (fetched 2026-08-10)
+## robots.txt summary (re-checked 2026-11-11)
 
-The relevant rules from `https://www.stepstone.de/robots.txt`:
+The relevant rules from `https://www.stepstone.de/robots.txt`, all in the `User-agent: *` group:
 
 ```
+Disallow: /jobs/vollzeit/
+Disallow: /jobs/teilzeit/
+Allow: /jobs/teilzeit/in-*
+Disallow: /jobs/teilzeit/in-*?*
+Allow: /jobs/teilzeit/in-*?q=*
+Disallow: /jobs/home-office/
 Disallow: /jobs/*?*
 Allow: /jobs/*?q=*
 Disallow: /jobs/*?q*&*
@@ -20,13 +26,19 @@ Disallow: /public-api/
 
 - `/jobs/*` with **any** query string is disallowed, **except** a bare `?q=<value>` with no
   other parameters (the `Disallow: /jobs/*?q*&*` line blocks appending anything else via `&`).
-  That means no robots.txt-compliant way to add `--jobage`/`--page` as query params on this path.
+  This CLI uses no query string at all (see below), so none of those rules are in play.
+- The category paths `/jobs/vollzeit/`, `/jobs/home-office/` and `/jobs/teilzeit/` are
+  disallowed. `/jobs/teilzeit/in-<city>` is allowed by the longer `Allow` line. The CLI refuses
+  a query that is only one of those words (a `teilzeit` search needs a `--location`), and
+  `isRobotsAllowedPath()` in `helpers.ts` enforces the same rules on every request and every
+  redirect target.
 - `/search-results` and `/listing` (the classic results-page routes) are fully disallowed.
 - `/public-api/` is disallowed — this is the endpoint (`/public-api/resultlist/`) that actually
   backs the search UI's live results (visible in the page's client bundle), so it is off-limits
-  even though it would be the "obvious" JSON API to call.
-- Nothing under `/stellenangebote--...` (job detail pages) or `/jobs/<slug>[/in-<city>]`
-  (path-segment search, no query string) is disallowed.
+  even though it would be the "obvious" JSON API to call. A redirect to it is refused.
+- Any other `/jobs/<slug>[/in-<city>]` path (path-segment search, no query string) is allowed.
+  Job detail pages (`/stellenangebote--...`) are not disallowed either, but this CLI does not
+  fetch them (see below).
 
 ## Why no query string?
 

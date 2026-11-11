@@ -1,4 +1,14 @@
-import { buildSearchUrl, countJobCardMarkers, htmlFetch, parseJobCards, stripControl, writeError, type JobCard } from "../helpers.js"
+import {
+  buildSearchUrl,
+  cleanDeep,
+  countJobCardMarkers,
+  htmlFetch,
+  parseJobCards,
+  SearchInputError,
+  stripControl,
+  writeError,
+  type JobCard,
+} from "../helpers.js"
 
 export interface SearchOpts {
   query?: string
@@ -7,7 +17,7 @@ export interface SearchOpts {
   format: "json" | "table" | "plain"
 }
 
-function renderTable(cards: JobCard[]): string {
+export function renderTable(cards: JobCard[]): string {
   if (cards.length === 0) return "No results."
   const rows = cards.map((c) => {
     const title = stripControl(c.title || "").slice(0, 42).padEnd(42)
@@ -19,6 +29,21 @@ function renderTable(cards: JobCard[]): string {
   const header =
     "ID".padEnd(11) + " " + "TITLE".padEnd(42) + " " + "COMPANY".padEnd(26) + " " + "LOCATION".padEnd(24) + " DATE"
   return [header, "-".repeat(header.length), ...rows].join("\n")
+}
+
+/** Four lines per result (title; company, location, date; id; url), separated by a blank line. */
+export function renderPlain(cards: JobCard[]): string {
+  if (cards.length === 0) return "No results."
+  return cards
+    .map((c) =>
+      [
+        stripControl(c.title),
+        `  ${stripControl(c.company || "—")} · ${stripControl(c.location || "—")} · ${stripControl(c.date || "—")}`,
+        `  id: ${stripControl(c.id)}`,
+        `  ${stripControl(c.url)}`,
+      ].join("\n"),
+    )
+    .join("\n\n")
 }
 
 export async function runSearch(opts: SearchOpts): Promise<number> {
@@ -34,28 +59,31 @@ export async function runSearch(opts: SearchOpts): Promise<number> {
       )
       return 1
     }
+    if (cards.length < markers) {
+      // Some cards did not parse: say so on stderr, keep the results we have.
+      process.stderr.write(
+        JSON.stringify({
+          warning: `Parsed ${cards.length} of ${markers} job cards; StepStone's markup may have changed.`,
+          code: "PARTIAL_PARSE",
+        }) + "\n",
+      )
+    }
     if (opts.limit !== undefined && opts.limit >= 0) cards = cards.slice(0, opts.limit)
 
     if (opts.format === "table") {
       process.stdout.write(renderTable(cards) + "\n")
     } else if (opts.format === "plain") {
-      process.stdout.write(
-        (cards.length === 0
-          ? "No results."
-          : cards
-              .map((c) =>
-                stripControl(
-                  `${c.title}\n  ${c.company || "—"} · ${c.location || "—"} · ${c.date || "—"}\n  id: ${c.id}\n  ${c.url}`,
-                ),
-              )
-              .join("\n\n")) + "\n",
-      )
+      process.stdout.write(renderPlain(cards) + "\n")
     } else {
-      process.stdout.write(JSON.stringify({ meta: { count: cards.length, url }, results: cards }, null, 2) + "\n")
+      process.stdout.write(JSON.stringify({ meta: { count: cards.length, url }, results: cleanDeep(cards) }, null, 2) + "\n")
     }
     return 0
   } catch (e) {
-    writeError(e instanceof Error ? e.message : String(e), "SEARCH_FAILED")
+    if (e instanceof SearchInputError) {
+      writeError(e.message, "BAD_ARG")
+    } else {
+      writeError(e instanceof Error ? e.message : String(e), "SEARCH_FAILED")
+    }
     return 1
   }
 }
