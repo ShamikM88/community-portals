@@ -106,11 +106,13 @@ is the link to open in a browser.
 This is a React app using Emotion CSS-in-JS. Class names like `res-du9bhi`, `job-ad-display-xxeiht`
 are **generated per build and not guaranteed stable** — do not parse against them. Everything in
 the parser keys off `data-at`, `data-genesis-element` and `data-testid` attributes instead (the
-card boundary is `data-at="job-item" data-testid="job-item"`, and the title link is matched
-by its attribute order), which read as intentional, semantic test/analytics hooks and were
-stable across all pages fetched during development (search results, multiple queries). Those
-patterns do assume the attribute order and adjacency seen there, so a markup change can break
-parsing. When the page has job cards but none parse, the CLI fails with `PARSE_FAILED` instead
+card boundary is `data-at="job-item" data-testid="job-item"` in either order, the title link is
+the `<a>` tag carrying `data-testid="job-item-title"` with its `href` read from the same tag,
+and the date is the text of the `<time>` element inside `data-at="job-item-timeago"`), which read
+as intentional, semantic test/analytics hooks and were stable across all pages fetched during
+development (search results, multiple queries). The field markers (`data-at="job-item-title"`,
+`-company-name`, `-location`, `-timeago`) are still matched as written, so renaming one of them
+can break parsing. When the page has job cards but none parse, the CLI fails with `PARSE_FAILED` instead
 of reporting "No results". If that happens, check whether these attributes were renamed or
 restructured first.
 

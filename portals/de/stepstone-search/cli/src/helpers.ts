@@ -265,7 +265,10 @@ export function parseJobCards(html: string): JobCard[] {
   for (const raw of chunks) {
     const chunk = raw.slice(0, 20000)
 
-    const hrefMatch = chunk.match(/data-genesis-element="ANCHOR" href="([^"]+)" data-testid="job-item-title"/)
+    // Find the title link as a whole tag, then read its href, so attribute order inside the tag
+    // does not matter.
+    const anchorTag = chunk.match(/<a\b[^<>]*\bdata-testid="job-item-title"[^<>]*>/)
+    const hrefMatch = anchorTag ? anchorTag[0].match(/\bhref="([^"]+)"/) : null
     if (!hrefMatch) continue
     const href = hrefMatch[1]!
     const idMatch = href.match(/--(\d+)-inline\.html/)

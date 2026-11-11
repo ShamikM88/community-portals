@@ -17,6 +17,16 @@ function card(id: string, title: string, company: string, location: string, time
 }
 
 describe("parseJobCards", () => {
+  test("the title link is found whatever order its attributes are in", () => {
+    const html = card("14255090", "Product Manager", "N26 GmbH", "Berlin").replace(
+      '<a data-genesis-element="ANCHOR" href="/stellenangebote--Slug--14255090-inline.html" data-testid="job-item-title" data-at="job-item-title">',
+      '<a data-at="job-item-title" data-testid="job-item-title" class="x" href="/stellenangebote--Slug--14255090-inline.html" data-genesis-element="ANCHOR">',
+    );
+    const [c] = parseJobCards(html);
+    expect(c!.id).toBe("14255090");
+    expect(c!.url).toBe("https://www.stepstone.de/stellenangebote--Slug--14255090-inline.html");
+  });
+
   test("extracts id, title, company, location, date, url from a card", () => {
     const html = card("14255090", "Product Manager", "N26 GmbH", "Berlin", "vor 2 Tagen");
     const [c] = parseJobCards(html);
