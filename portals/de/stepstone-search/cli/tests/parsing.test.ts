@@ -22,6 +22,8 @@ describe("parseJobCards", () => {
       '<a data-genesis-element="ANCHOR" href="/stellenangebote--Slug--14255090-inline.html" data-testid="job-item-title" data-at="job-item-title">',
       '<a data-at="job-item-title" data-testid="job-item-title" class="x" href="/stellenangebote--Slug--14255090-inline.html" data-genesis-element="ANCHOR">',
     );
+    // Guard against the swap silently doing nothing if card() changes.
+    expect(html).toContain('<a data-at="job-item-title" data-testid="job-item-title" class="x" href=');
     const [c] = parseJobCards(html);
     expect(c!.id).toBe("14255090");
     expect(c!.url).toBe("https://www.stepstone.de/stellenangebote--Slug--14255090-inline.html");

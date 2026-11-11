@@ -111,8 +111,10 @@ the `<a>` tag carrying `data-testid="job-item-title"` with its `href` read from 
 and the date is the text of the `<time>` element inside `data-at="job-item-timeago"`), which read
 as intentional, semantic test/analytics hooks and were stable across all pages fetched during
 development (search results, multiple queries). The field markers (`data-at="job-item-title"`,
-`-company-name`, `-location`, `-timeago`) are still matched as written, so renaming one of them
-can break parsing. When the page has job cards but none parse, the CLI fails with `PARSE_FAILED` instead
+`-company-name`, `-location`, `-timeago`) are still matched as written. Renaming
+`data-at="job-item-title"` drops every card; renaming one of the other three leaves the cards but
+makes that field `null` for all of them, so an all-null company, location or date is the symptom of
+a rename. When the page has job cards but none parse, the CLI fails with `PARSE_FAILED` instead
 of reporting "No results". If that happens, check whether these attributes were renamed or
 restructured first.
 
