@@ -250,9 +250,8 @@ const CARD_MARKER = /data-at="job-item"\s+data-testid="job-item"|data-testid="jo
  * page's inline CSS also mentions `[data-at="job-item"]` as a selector, which is not a card.
  */
 export function countJobCardMarkers(html: string): number {
-  const inTag = (attr: string) =>
-    (html.match(new RegExp(`<[^<>]*\\b${attr}="job-item"[^<>]*>`, "g")) ?? []).length
-  return Math.max(inTag("data-at"), inTag("data-testid"))
+  // One pass over tags, so a page that mixes the two attributes counts each card once.
+  return (html.match(/<[^<>]*\b(?:data-at|data-testid)="job-item"[^<>]*>/g) ?? []).length
 }
 
 /**

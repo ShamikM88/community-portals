@@ -73,16 +73,24 @@ describe("robots.txt paths", () => {
 describe("cleanDeep", () => {
   test("strips C1 and C0 controls from every string, including nested ones", () => {
     const cleaned = cleanDeep({ title: "a\u009bb\u001bc", nested: { list: ["x\u009by"] }, n: 3 });
-    expect(JSON.stringify(cleaned)).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    // Check the raw strings: JSON.stringify would escape a leftover ESC and hide it from the regex.
+    for (const text of [cleaned.title, cleaned.nested.list[0]]) {
+      expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    }
+    expect(cleaned.title.startsWith("a")).toBe(true);
+    expect(cleaned.title.endsWith("c")).toBe(true);
     expect(cleaned.n).toBe(3);
   });
 });
 
 describe("plain output", () => {
   test("keeps four lines per result and strips controls inside each field", () => {
-    const out = renderPlain([{ id: "1", title: "T\u001b[31m", company: "C", location: "L", date: "vor 1 Tag", url: "https://www.stepstone.de/x" }]);
+    const out = renderPlain([
+      { id: "1\u001b", title: "T\u001b[31m", company: "C\u001b", location: "L\u009b", date: "vor 1 Tag\u001b", url: "https://www.stepstone.de/x\u001b" },
+    ]);
     expect(out.split("\n")).toHaveLength(4);
-    expect(out).not.toMatch(/\u001b/);
+    // Newlines between the four lines are expected; every other control character is not.
+    expect(out).not.toMatch(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/);
     expect(renderPlain([])).toBe("No results.");
   });
 });
@@ -132,6 +140,11 @@ describe("a markup change is loud, not 'no results'", () => {
     const css = '<style data-emotion="res x">.res-a [data-genesis-element="CARD"],.res-a [data-at="job-item"]{border-radius:4px;}</style>';
     expect(countJobCardMarkers(css)).toBe(0);
     expect(countJobCardMarkers(css + '<article id="job-item-1" data-at="job-item" data-testid="job-item"></article>')).toBe(1);
+  });
+
+  test("a page that mixes the two single-attribute forms counts every card", () => {
+    const mixed = '<div data-at="job-item">a</div><div data-testid="job-item">b</div><div data-at="job-item" data-testid="job-item">c</div>';
+    expect(countJobCardMarkers(mixed)).toBe(3);
   });
 
   test("a page with no cards at all has zero markers", () => {
