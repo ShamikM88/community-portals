@@ -1,4 +1,4 @@
-import { fetchApiPage, filterJobs, extractMeta, stripControl, writeError, type JobCard, type ListOpts } from "../helpers.js"
+import { cleanDeep, fetchApiPage, filterJobs, extractMeta, stripControl, writeError, type JobCard, type ListOpts } from "../helpers.js"
 
 export interface SearchOpts extends ListOpts {
   page: number
@@ -46,7 +46,7 @@ export async function runSearch(opts: SearchOpts): Promise<number> {
       )
     } else {
       process.stdout.write(
-        JSON.stringify({ meta: { count: cards.length, page: meta.page, perPage: meta.perPage }, results: cards }, null, 2) +
+        JSON.stringify({ meta: { count: cards.length, page: meta.page, perPage: meta.perPage }, results: cleanDeep(cards) }, null, 2) +
           "\n",
       )
     }

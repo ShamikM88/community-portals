@@ -21,7 +21,7 @@ SEARCH FLAGS
   --query, -q <text>      Keywords, matched against title, company, and tags. Recommended.
   --location, -l <text>   Substring match against the location field, e.g. "Berlin".
   --jobage <days>         Only jobs posted within N days (uses the API's created_at field).
-  --page <n>              1-indexed server page to fetch (~176 jobs/page). Default 1.
+  --page <n>              1-indexed server page to fetch (the API sets the page size). Default 1.
   --limit, -n <n>         Cap results emitted (client-side, applied after filtering).
   --format <fmt>          json (default) | table | plain.
 

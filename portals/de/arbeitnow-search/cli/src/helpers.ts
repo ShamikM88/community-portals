@@ -48,7 +48,21 @@ const MAX_REDIRECTS = 5
 export function isDisallowedPath(input: string): boolean {
   try {
     const u = new URL(input)
-    return /^\/jobs\/companies\/.*\/apply/.test(u.pathname) || u.search.startsWith("?__hstc")
+    // Decode up to three times so %61pply and double-encoded forms are caught too.
+    let decoded = u.pathname
+    for (let i = 0; i < 3; i++) {
+      let next: string
+      try {
+        next = decodeURIComponent(decoded)
+      } catch {
+        return true // an undecodable path is refused
+      }
+      if (next === decoded) break
+      decoded = next
+    }
+    const apply = /^\/jobs\/companies\/.*\/apply/i
+    const tracking = [...u.searchParams.keys()].some((k) => k.toLowerCase().startsWith("__hstc"))
+    return apply.test(u.pathname) || apply.test(decoded) || tracking
   } catch {
     return true
   }
@@ -69,6 +83,16 @@ export function nextRedirectUrl(current: string, location: string | null): strin
   const next = new URL(location, current).href
   assertAllowedUrl(next)
   return next
+}
+
+/** Strip terminal control characters (ESC, C0, C1, DEL) from every string in a value, before JSON output. */
+export function cleanDeep<T>(value: T, keepNewlines = false): T {
+  if (typeof value === "string") return stripControl(value, keepNewlines) as T
+  if (Array.isArray(value)) return value.map((v) => cleanDeep(v, keepNewlines)) as T
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cleanDeep(v, keepNewlines)])) as T
+  }
+  return value
 }
 
 /** Strip terminal control characters (ESC, C0, C1, DEL) from remote text before printing it. */

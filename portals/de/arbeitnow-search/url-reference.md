@@ -19,8 +19,10 @@ requests apply pages, since it only reads postings.
 
 The API's job `url` values are spread over Arbeitnow's regional domains: `arbeitnow.com`,
 `arbeitnow.co.uk`, `arbeitnow.fr`, `arbeitnow.ch` and `arbeitnow.nl` (about 60% of one page
-were not `.com`). All five serve the same robots.txt and the same posting pages, and `detail`
-accepts a URL on any of them. Any other host is refused.
+were not `.com`). All five served the same robots.txt and the same posting pages when checked, and
+`detail` accepts a URL on any of them. Any other host is refused. A regional domain may
+answer some networks with a bot challenge instead of the page; `detail` then fails with
+`DETAIL_FAILED` and the HTTP status, and nothing is retried around it.
 
 ## Job-board API
 
@@ -56,12 +58,14 @@ response embeds its own terms:
     }
   ],
   "links": { "first": "...", "last": null, "next": "...?page=2", "prev": null },
-  "meta": { "current_page": 1, "per_page": 176, "terms": "...", "info": "..." }
+  "meta": { "current_page": 1, "per_page": 300, "terms": "...", "info": "..." }
 }
 ```
 
 - `description` is the **full** job description HTML in the API (confirmed: 10k+ characters on
   real postings). `search` output omits it; use `detail` to read the text.
+- `meta.per_page` was 176 when this skill was written and is 300 as of 2026-11-11. The CLI reads
+  the size from the response and never assumes it.
 - `created_at` is a **Unix timestamp** (seconds), always present, always reliable — unlike
   StepStone's relative German time strings, this converts cleanly to an ISO date.
 - `location` can be an **empty string** for fully-remote/unlocated postings — mapped to `null`.
@@ -88,7 +92,7 @@ during development by comparing responses:
 Conclusion: unrecognized query parameters are silently ignored (likely just changing which
 cache bucket nginx/Laravel serves), not used as filters. **This CLI therefore filters
 client-side** after fetching one page — see `filterJobs()` in `cli/src/helpers.ts`. `search`
-only searches the ONE page it fetches (`--page`, default 1, ~176 jobs); to look further back,
+only searches the ONE page it fetches (`--page`, default 1, one API page); to look further back,
 call `search` again with a higher `--page` (results are reverse-chronological, so higher pages
 are older postings).
 

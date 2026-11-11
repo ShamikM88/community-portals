@@ -50,7 +50,7 @@ See `../SKILL.md` for the full flag reference and the personal-use note.
 | `--query` | `-q` | Keywords, matched against title/company/tags. |
 | `--location` | `-l` | Substring match against location. |
 | `--jobage` | | Only postings within N days. |
-| `--page` | | 1-indexed server page (~176 jobs/page). Default 1. |
+| `--page` | | 1-indexed server page (the API sets the page size; see `meta.perPage` in the output). Default 1. |
 | `--limit` | `-n` | Cap results emitted. |
 | `--format` | | `json` \| `table` \| `plain`. |
 

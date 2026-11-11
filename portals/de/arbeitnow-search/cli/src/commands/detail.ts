@@ -1,4 +1,4 @@
-import { htmlFetch, isArbeitnowUrl, isDisallowedPath, parseJobDetail, stripControl, writeError } from "../helpers.js"
+import { cleanDeep, htmlFetch, isArbeitnowUrl, isDisallowedPath, parseJobDetail, stripControl, writeError } from "../helpers.js"
 
 export interface DetailOpts {
   id: string
@@ -51,7 +51,7 @@ export async function runDetail(opts: DetailOpts): Promise<number> {
       ].filter((l) => l !== "")
       process.stdout.write(stripControl(lines.join("\n"), true) + "\n")
     } else {
-      process.stdout.write(JSON.stringify(job, null, 2) + "\n")
+      process.stdout.write(JSON.stringify(cleanDeep(job, true), null, 2) + "\n")
     }
     return 0
   } catch (e) {

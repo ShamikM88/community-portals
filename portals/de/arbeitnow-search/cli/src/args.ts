@@ -24,8 +24,8 @@ const SPECS: Record<string, CommandSpec> = {
 
 const ALIASES: Record<string, string> = { q: "query", l: "location", n: "limit" }
 
-// Smallest allowed value per numeric flag. A zero limit is valid: it asks for no results.
-const MIN: Record<string, number> = { page: 1, jobage: 1, limit: 0 }
+// Allowed range per numeric flag. A zero limit is valid: it asks for no results.
+const RANGE: Record<string, [number, number]> = { page: [1, 1000], jobage: [1, 3650], limit: [0, 10000] }
 
 export interface ParsedArgs {
   command?: string
@@ -72,17 +72,21 @@ export function parseArgs(argv: string[]): ParsedArgs {
       value = next
       i++
     }
+    if (value === "") {
+      throw new ArgError(`--${name} needs a non-empty value`)
+    }
     if (name === "format") {
       if (!spec.formats.includes(value)) {
         throw new ArgError(`--format must be one of ${spec.formats.join(", ")}, got "${value}"`)
       }
       out.format = value
     } else if (kind === "int") {
-      const min = MIN[name] ?? 1
-      if (!/^\d+$/.test(value) || Number(value) < min) {
-        throw new ArgError(`--${name} must be a whole number of ${min} or more, got "${value}"`)
+      const [lo, hi] = RANGE[name] ?? [1, 1000]
+      const n = Number(value)
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(n) || n < lo || n > hi) {
+        throw new ArgError(`--${name} must be a whole number from ${lo} to ${hi}, got "${value.slice(0, 20)}"`)
       }
-      out.flags[name] = Number(value)
+      out.flags[name] = n
     } else {
       out.flags[name] = value
     }

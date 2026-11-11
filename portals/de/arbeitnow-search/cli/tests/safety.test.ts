@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decodeHtmlEntities, isDisallowedPath, nextRedirectUrl, stripControl } from "../src/helpers";
+import { cleanDeep, decodeHtmlEntities, isDisallowedPath, nextRedirectUrl, stripControl } from "../src/helpers";
 import { runCLI } from "./helpers";
 
 describe("redirects are checked before they are requested", () => {
@@ -43,6 +43,14 @@ describe("apply pages are never requested", () => {
     expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/some-job-1?utm_source=x")).toBe(false);
   });
 
+  test("percent-encoded apply paths and tracking parameters anywhere in the query are disallowed", () => {
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/job/%61pply")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/job/%2561pply")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/job-1?utm_source=x&__hstc=abc")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/job/%ZZ")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/acme/some-job-%C3%A9-1")).toBe(false);
+  });
+
   test("detail refuses a tracking-parameter URL before making any request", async () => {
     const result = await runCLI(["detail", "https://www.arbeitnow.com/jobs/companies/acme/some-job-1?__hstc=abc"]);
     expect(result.exitCode).toBe(1);
@@ -65,6 +73,18 @@ describe("stripControl", () => {
 
   test("keepNewlines keeps line breaks and tabs but still removes escapes", () => {
     expect(stripControl("line1\nline2\tx\u001b[2J", true)).toBe("line1\nline2\tx[2J");
+  });
+});
+
+describe("cleanDeep", () => {
+  test("strips C1 and C0 controls from every string, including nested ones", () => {
+    const cleaned = cleanDeep({ title: "a\u009bb\u001bc", nested: { list: ["x\u009by"] }, n: 3 });
+    expect(JSON.stringify(cleaned)).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    expect(cleaned.n).toBe(3);
+  });
+
+  test("keepNewlines keeps line breaks for descriptions", () => {
+    expect(cleanDeep({ d: "line1\nline2\u009b" }, true).d).toBe("line1\nline2");
   });
 });
 
