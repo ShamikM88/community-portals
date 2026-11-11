@@ -40,7 +40,17 @@ describe("parseArgs", () => {
   test("malformed numbers are rejected, not truncated", () => {
     expect(fails(["search", "--limit", "3oops"])).toContain("--limit must be a whole number");
     expect(fails(["search", "--limit", "1.5"])).toContain("--limit");
-    expect(fails(["search", "--limit", "0"])).toContain("--limit");
+  });
+
+  test("a zero limit is valid (no results)", () => {
+    expect(parseArgs(["search", "--limit", "0"]).flags.limit).toBe(0);
+  });
+
+  test("names like toString or constructor are never treated as commands or flags", () => {
+    expect(parseArgs(["toString"]).command).toBe("toString");
+    expect(parseArgs(["toString"]).positional).toEqual([]);
+    expect(fails(["search", "--constructor", "x"])).toContain("Unknown flag");
+    expect(fails(["search", "--toString", "x"])).toContain("Unknown flag");
   });
 
   test("a value-taking flag without a value is an error, not a dropped filter", () => {
