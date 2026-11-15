@@ -41,6 +41,18 @@ response embeds its own terms:
 
 **Keep volume low** per that notice, even though nothing here is robots.txt-disallowed.
 
+### Terms of service (read 2026-11-15, arbeitnow.com/terms)
+
+- Section 11 covers the API: it is provided "as is", "we may revoke the permission to use API at
+  any time", and users agree to link back to Arbeitnow.com. It does not forbid automated reads of
+  the API or set a rate limit; the API notice above says "please do not abuse".
+- Section 2 (Use License) is the site-wide licence for the website's materials: personal,
+  non-commercial, transitory viewing only; no copying or "mirroring" them, and no commercial or
+  public display. It says nothing explicit about automated access to pages.
+- `detail` reads a single posting's HTML page, one at a time, on request. That is why this skill is
+  scoped to personal, low-volume use and does not store, republish or mirror results. Use it for
+  that and nothing else, and check the terms again before relying on it for anything else.
+
 ### Response shape
 
 ```json
@@ -69,7 +81,7 @@ response embeds its own terms:
 - `meta.per_page` was 176 when this skill was written and is 300 as of 2026-11-11. The CLI reads
   the size from the response and never assumes it.
 - `created_at` is a **Unix timestamp** (seconds), always present, always reliable — unlike
-  StepStone's relative German time strings, this converts cleanly to an ISO date.
+  a relative time string, this converts cleanly to an ISO date.
 - `location` can be an **empty string** for fully-remote/unlocated postings — mapped to `null`.
 - No numeric/stable job ID field; `slug` is the closest thing to one, but it does **not**
   include the company slug that the job's own URL needs (see Detail below).

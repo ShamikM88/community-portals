@@ -93,6 +93,14 @@ describe("cleanDeep", () => {
   });
 });
 
+describe("apply-page guard and doubled slashes", () => {
+  test("a doubled slash does not hide an apply path", () => {
+    expect(isDisallowedPath("https://www.arbeitnow.com//jobs/companies/x/y/apply")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs//companies///x/y/apply")).toBe(true);
+    expect(isDisallowedPath("https://www.arbeitnow.com/jobs/companies/x/y-123")).toBe(false);
+  });
+});
+
 describe("decodeHtmlEntities", () => {
   test("does not decode twice: &amp;lt; stays as the text &lt;", () => {
     expect(decodeHtmlEntities("&amp;lt;b&amp;gt;")).toBe("&lt;b&gt;");

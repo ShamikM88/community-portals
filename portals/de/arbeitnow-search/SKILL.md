@@ -19,9 +19,8 @@ allowed-tools: Bash(bun run .agents/skills/arbeitnow-search/cli/src/cli.ts *)
 # Arbeitnow Search Skill
 
 Search live German job listings via Arbeitnow's free public job-board API. No authentication
-needed, **zero runtime dependencies** — it runs with just `bun`. Complements `stepstone-search`
-with an aggregator that leans toward English-speaking-friendly and remote-friendly German-market
-roles.
+needed, **zero runtime dependencies** — it runs with just `bun`. An aggregator that leans toward
+English-speaking-friendly and remote-friendly German-market roles.
 
 ## Personal use, low volume
 
@@ -102,13 +101,12 @@ All errors are written to **stderr** as `{ "error": "...", "code": "..." }` and 
 
 ## Notes
 
-- `search`'s `description` field already comes back full (via `detail`) — `search` results
-  themselves don't include description text (kept out to keep table/json output scannable);
-  call `detail` on a specific `url` when you need the full text.
+- `search` results do not include description text (kept out so table and json output stay
+  scannable); call `detail` on a specific `url` when you need the full text.
 - `date` in `search` output is a real ISO timestamp; `datePosted`/`validThrough` in `detail`
-  output are also ISO — no relative-time-string parsing needed (unlike `stepstone-search`).
+  output are also ISO — no relative-time-string parsing needed.
 - `location` can be `null` for fully-remote or unlocated postings.
 - Query keywords work in **English or German** — many Arbeitnow listings are themselves posted
-  in English, which fits the candidate's "English-speaking roles only" constraint for Germany.
+  in English, so English-speaking roles are easy to find.
 - See `url-reference.md` for the full API response shape, the verification that no server-side
   search exists, and the JSON-LD detail-page structure.

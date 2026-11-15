@@ -61,8 +61,10 @@ export function isDisallowedPath(input: string): boolean {
       decoded = next
     }
     const apply = /^\/jobs\/companies\/.*\/apply/i
+    // Collapse repeated slashes first: `//jobs/companies/x/y/apply` must not slip past the `^/jobs` anchor.
+    const flat = (path: string) => path.replace(/\/{2,}/g, "/")
     const tracking = [...u.searchParams.keys()].some((k) => k.toLowerCase().startsWith("__hstc"))
-    return apply.test(u.pathname) || apply.test(decoded) || tracking
+    return apply.test(flat(u.pathname)) || apply.test(flat(decoded)) || tracking
   } catch {
     return true
   }
@@ -102,11 +104,16 @@ export function stripControl(text: string, keepNewlines = false): string {
     : text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
 }
 
-async function fetchWithBackoff(startUrl: string, accept: string): Promise<Response> {
+export async function fetchWithBackoff(
+  startUrl: string,
+  accept: string,
+  opts: { baseDelayMs?: number } = {},
+): Promise<Response> {
   let url = startUrl
   assertAllowedUrl(url)
   const maxRetries = 6
-  let delay = 500
+  const base = opts.baseDelayMs ?? 500
+  let delay = base
   let retries = 0
   let redirects = 0
   for (;;) {
@@ -125,9 +132,9 @@ async function fetchWithBackoff(startUrl: string, accept: string): Promise<Respo
       if (retries++ >= maxRetries) {
         throw new Error(`Request failed: ${response.status} ${response.statusText}`)
       }
-      const jitter = Math.floor(Math.random() * 500)
+      const jitter = Math.floor(Math.random() * base)
       await new Promise((r) => setTimeout(r, delay + jitter))
-      delay = Math.min(delay * 2, 8000)
+      delay = Math.min(delay * 2, base * 16)
       continue
     }
     return response
@@ -192,9 +199,11 @@ export interface JobDetail extends JobCard {
 }
 
 function stripTags(html: string): string {
+  // Collapse runs of spaces but keep newlines, so paragraph and list breaks survive.
   return html
     .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ ?\n ?/g, "\n")
     .trim()
 }
 
@@ -270,11 +279,11 @@ export function filterJobs(page: ApiResponse, opts: ListOpts): JobCard[] {
 
   let jobs = page.data
   if (q) {
+    // Match against the decoded text, which is what the output shows, so `-q geschäftsführer`
+    // finds a title the API returned as `Gesch&auml;ftsf&uuml;hrer`.
+    const hay = (text: string) => decodeHtmlEntities(text).toLowerCase()
     jobs = jobs.filter(
-      (j) =>
-        j.title.toLowerCase().includes(q) ||
-        j.company_name.toLowerCase().includes(q) ||
-        j.tags.some((t) => t.toLowerCase().includes(q)),
+      (j) => hay(j.title).includes(q) || hay(j.company_name).includes(q) || j.tags.some((t) => hay(t).includes(q)),
     )
   }
   if (loc) {

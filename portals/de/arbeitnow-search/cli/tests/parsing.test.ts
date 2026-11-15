@@ -107,6 +107,24 @@ describe("extractMeta", () => {
   });
 });
 
+describe("description line breaks and decoded matching", () => {
+  test("paragraph and list breaks survive in a description", () => {
+    const html = `<html><head><script type="application/ld+json">${JSON.stringify({
+      "@context": "https://schema.org/",
+      "@graph": [{ "@type": "JobPosting", title: "T", description: "<p>Para one.</p><p>Para two.</p><ul><li>A</li><li>B</li></ul>" }],
+    })}</script></head><body></body></html>`;
+    const d = parseJobDetail(html, "https://www.arbeitnow.com/jobs/companies/x/y-1")!;
+    expect(d.description).toBe("Para one.\nPara two.\nA\nB");
+  });
+
+  test("a query with umlauts matches a title the API returned HTML-encoded", () => {
+    const jobs = [job({ title: "Gesch&auml;ftsf&uuml;hrer (m/w/d)" }), job({ title: "Other", slug: "other-2" })];
+    const out = filterJobs(apiPage(jobs) as any, { query: "geschäftsführer" });
+    expect(out).toHaveLength(1);
+    expect(filterJobs(apiPage(jobs) as any, { query: "geschaeftsfuehrer" })).toHaveLength(0);
+  });
+});
+
 describe("parseJobDetail", () => {
   function ldJsonHtml(jobPosting: Record<string, any>): string {
     return `<html><head><script type="application/ld+json">${JSON.stringify({
