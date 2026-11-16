@@ -19,7 +19,7 @@ allowed-tools: Bash(bun run .agents/skills/arbeitnow-search/cli/src/cli.ts *)
 # Arbeitnow Search Skill
 
 Search live German job listings via Arbeitnow's free public job-board API. No authentication
-needed, **zero runtime dependencies** — it runs with just `bun`. An aggregator that leans toward
+needed, **zero runtime dependencies** — it runs with just `bun`. It is an aggregator that leans toward
 English-speaking-friendly and remote-friendly German-market roles.
 
 ## Personal use, low volume
