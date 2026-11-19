@@ -21,11 +21,11 @@ portals/<country>/<board>-search/
 1. Generate it with `/add-portal` in your AI Job Search checkout. That command is the portal contract.
 2. Copy the generated `.agents/skills/<board>-search/` folder to `portals/<country>/<board>-search/` here.
 3. Add yourself as its owner in `.github/CODEOWNERS` (see below).
-4. Open a PR with a [Conventional Commits](https://www.conventionalcommits.org/) title, e.g. `feat(dk): add jobindex-search`. One portal per PR.
+4. Open a PR with a [Conventional Commits](https://www.conventionalcommits.org/) title, e.g. `feat(dk): add jobindex-search`; CI checks it with commitizen, and again on every title edit. Until your first PR merges, each run waits for a maintainer to approve it. One portal per PR.
 
 Every PR is read before it merges. The bar is not code quality. It is these five things:
 
-1. **The contract.** `search` (`--format json|table|plain`) and `detail` (`--format json|plain`, `table` optional) commands, JSON errors on stderr with exit 1, backoff on 429/5xx, zero runtime dependencies, and tests. Declare any deviation in the PR ("this board has no pagination, so `--page` isn't supported").
+1. **The contract.** `search` (`--format json|table|plain`) and `detail` (`--format json|plain`, `table` optional) commands, JSON errors on stderr with exit 1, backoff on 429/5xx, zero runtime dependencies, tests, and a `Query syntax:` line under the search command in `SKILL.md` stating whether the board honours phrase quoting and which operators it supports (`/scrape` follows it). Declare any deviation in the PR ("this board has no pagination, so `--page` isn't supported").
 2. **A safety pass.** No install or lifecycle scripts, no `trustedDependencies`, `bunfig.toml` or `.npmrc`, no requests beyond the board you declare, nothing reading environment variables or files beyond what the skill needs.
 3. **Honest scoping.** A personal-use note where the board's terms call for one. Anything metered or needing an API key ships `enabled: false`.
 4. **robots.txt and terms respected.** Document what the site allows and what the skill stays off. Boards that block automated access stay on the WebSearch fallback rather than getting a workaround.
